@@ -1,0 +1,42 @@
+diff --git a/main/apps/apps.h b/main/apps/apps.h
+index b30c8ac..c68712a 100644
+--- a/main/apps/apps.h
++++ b/main/apps/apps.h
+@@ -14,3 +14,4 @@
+ #include "app_badge/app_badge.h"
+ #include "app_lucky_wheel/app_lucky_wheel.h"
+ #include "apps/app_alarm_clock/app_alarm_clock.h"
++#include "app_claude/app_claude.h"
+diff --git a/main/main.cpp b/main/main.cpp
+index ba08782..bb34967 100644
+--- a/main/main.cpp
++++ b/main/main.cpp
+@@ -28,16 +28,19 @@ extern "C" void app_main(void)
+     ui_hal::on_delay([](uint32_t ms) { GetHAL().delay(ms); });
+     ui_hal::on_get_tick([]() { return GetHAL().millis(); });
+ 
+-    // Install apps
+-    GetMooncake().installApp(std::make_unique<AppLauncher>());
+-    GetMooncake().installApp(std::make_unique<AppAlarmClock>());
+-    GetMooncake().installApp(std::make_unique<AppWatchFace>());
+-    GetMooncake().installApp(std::make_unique<AppStopWatch>());
+-    GetMooncake().installApp(std::make_unique<AppBadge>());
+-    GetMooncake().installApp(std::make_unique<AppImu>());
+-    GetMooncake().installApp(std::make_unique<AppFft>());
+-    GetMooncake().installApp(std::make_unique<AppLuckyWheel>());
++    // clawd-watch boots straight into AppClaude. Other apps stay disabled
++    // so the watch is a single-purpose Claude Code companion. Setup is kept
++    // available so the user can reach pairing/factory-reset menus.
++    GetMooncake().installApp(std::make_unique<AppClaude>());
+     GetMooncake().installApp(std::make_unique<AppSetup>());
++    // GetMooncake().installApp(std::make_unique<AppLauncher>());
++    // GetMooncake().installApp(std::make_unique<AppAlarmClock>());
++    // GetMooncake().installApp(std::make_unique<AppWatchFace>());
++    // GetMooncake().installApp(std::make_unique<AppStopWatch>());
++    // GetMooncake().installApp(std::make_unique<AppBadge>());
++    // GetMooncake().installApp(std::make_unique<AppImu>());
++    // GetMooncake().installApp(std::make_unique<AppFft>());
++    // GetMooncake().installApp(std::make_unique<AppLuckyWheel>());
+     // GetMooncake().installApp(std::make_unique<AppTemplate>());
+ 
+     // Main loop

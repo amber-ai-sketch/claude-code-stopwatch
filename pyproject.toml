@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "clawd-watch"
+version = "0.1.0"
+description = "Claude Code companion for the M5Stack Stopwatch (ESP32-S3 + 466x466 round AMOLED). Bridges the CLI to the watch over BLE for status display + voice input via HID."
+requires-python = ">=3.9"
+dependencies = [
+  "bleak>=0.22",
+  "aiohttp>=3.9",
+]
+
+[project.scripts]
+clawd-watch-daemon = "clawd_watch.daemon:main"
+clawd-watch-hook   = "clawd_watch.hook:main"
+clawd-watch        = "clawd_watch.cli:main"
+clawd-statusline   = "clawd_watch.statusline:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
