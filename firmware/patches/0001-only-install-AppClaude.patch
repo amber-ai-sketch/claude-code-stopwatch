@@ -8,10 +8,10 @@ index b30c8ac..c68712a 100644
  #include "apps/app_alarm_clock/app_alarm_clock.h"
 +#include "app_claude/app_claude.h"
 diff --git a/main/main.cpp b/main/main.cpp
-index ba08782..bb34967 100644
+index ba08782..afe3504 100644
 --- a/main/main.cpp
 +++ b/main/main.cpp
-@@ -28,16 +28,19 @@ extern "C" void app_main(void)
+@@ -28,16 +28,24 @@ extern "C" void app_main(void)
      ui_hal::on_delay([](uint32_t ms) { GetHAL().delay(ms); });
      ui_hal::on_get_tick([]() { return GetHAL().millis(); });
  
@@ -27,8 +27,13 @@ index ba08782..bb34967 100644
 +    // clawd-watch boots straight into AppClaude. Other apps stay disabled
 +    // so the watch is a single-purpose Claude Code companion. Setup is kept
 +    // available so the user can reach pairing/factory-reset menus.
-+    GetMooncake().installApp(std::make_unique<AppClaude>());
++    int claude_app_id = GetMooncake().installApp(std::make_unique<AppClaude>());
      GetMooncake().installApp(std::make_unique<AppSetup>());
++
++    // installApp only registers; nothing opens an app on its own (the
++    // launcher is normally responsible). Since we skip the launcher, kick
++    // AppClaude into onOpen() right away so it takes the screen.
++    GetMooncake().openApp(claude_app_id);
 +    // GetMooncake().installApp(std::make_unique<AppLauncher>());
 +    // GetMooncake().installApp(std::make_unique<AppAlarmClock>());
 +    // GetMooncake().installApp(std::make_unique<AppWatchFace>());
