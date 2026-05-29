@@ -2,14 +2,14 @@
  * SPDX-FileCopyrightText: 2026 ym (claude-code-stopwatch)
  * SPDX-License-Identifier: MIT
  *
- * Bridges button GPIO state → ButtonFsm events → BLE HID keystrokes.
+ * Bridges right-button level → NUS JSON key commands for the Mac daemon.
  *
  * Tick once per main loop. Holds long-press behavior across ticks
  * (Shift+Space stays pressed while right button is held, releases on
- * release) since ButtonFsm only emits Long once at threshold crossing.
+ * release).
  *
- * M5 minimal mapping (only right-button long-press is wired for now):
- *   right long-press   → Shift+Space hold while held, release on lift
+ * Minimal mapping (only right-button long-press is wired for now):
+ *   right long-press   → key_down shift+space, key_up on lift
  *   everything else    → not yet
  */
 #pragma once

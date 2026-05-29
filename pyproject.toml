@@ -10,6 +10,8 @@ requires-python = ">=3.9"
 dependencies = [
   "bleak>=0.22",
   "aiohttp>=3.9",
+  # Plan B: macOS keyboard injection via Quartz Event Services.
+  "pyobjc-framework-Quartz>=10.0; sys_platform == 'darwin'",
 ]
 
 [project.scripts]

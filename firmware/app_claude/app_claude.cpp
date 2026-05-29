@@ -76,24 +76,14 @@ void AppClaude::onRunning()
         (void)_key_manager->update();
     }
 
-    // M5: read button state via HAL's m5::Button_Class objects. HAL's
-    // updateButtonStates() runs inside _key_manager->update() above and
-    // refreshes btnA/btnB from raw GPIO. We read isPressed() instead of
-    // calling gpio_get_level directly because some HAL revisions remap
-    // pin numbers between hardware variants.
+    // Button state via HAL's m5::Button_Class. updateButtonStates() runs
+    // inside _key_manager->update() above and refreshes btnA/btnB from
+    // GPIO (KEYA=GPIO2=btnA, KEYB=GPIO1=btnB).
     bool right_pressed = GetHAL().btnB.isPressed();
     bool left_pressed  = GetHAL().btnA.isPressed();
 
-    // Debug: per-second heartbeat + level transitions. mclog uses fmt
-    // syntax (`{}`), not printf `%d`.
+    // Log press/release edges to trace the input → NUS path.
     static bool last_r = false, last_l = false;
-    static uint32_t dbg_last = 0;
-    uint32_t dbg_now = GetHAL().millis();
-    if (dbg_now - dbg_last > 1000) {
-        dbg_last = dbg_now;
-        mclog::tagInfo(getAppInfo().name, "tick R={} L={}",
-                       (int)right_pressed, (int)left_pressed);
-    }
     if (right_pressed != last_r) {
         mclog::tagInfo(getAppInfo().name, "right={}", (int)right_pressed);
         last_r = right_pressed;

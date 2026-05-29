@@ -18,3 +18,6 @@ firmware/.cache/
 # Editor
 .vscode/
 .idea/
+
+# Claude Code local hooks audit log
+.claude/

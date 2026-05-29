@@ -4,17 +4,22 @@
  *
  * Right-button long-press mapping for M5.
  *
- * Why this isn't using ButtonFsm yet: ButtonFsm emits a single Long
- * event when threshold crosses, but we need press+hold+release semantics
+ * Sends NUS JSON commands (not BLE HID): macOS rejects HID input from a
+ * BLE-HID device that wasn't paired through the Bluetooth UI, so the Mac
+ * daemon injects the keystroke locally via Quartz instead. The device
+ * just tells it which key to press.
+ *
+ * Why this isn't using ButtonFsm: ButtonFsm emits a single Long event
+ * when threshold crosses, but we need press+hold+release semantics
  * (Shift+Space pressed continuously while held, released on lift) so
  * WeChat IME enters dictation on the leading edge and exits on the
  * trailing edge. Direct level tracking is simpler than threading state
- * through FSM events. M3 FSM still drives single/double click + left
- * button events later.
+ * through FSM events.
  */
 #include "hid_dispatcher.h"
-#include "../ble/ble_hid.h"
+#include "../ble/ble_nus.h"
 #include "esp_log.h"
+#include <string.h>
 
 static const char* TAG = "hid_dispatch";
 
@@ -30,15 +35,17 @@ void HidDispatcher::tick(bool /*left_pressed*/, bool right_pressed, uint32_t now
 
     if (right_pressed && !_shift_space_held &&
         (now_ms - _right_press_start_ms >= kLongMs)) {
-        // Crossed long threshold — send Shift+Space and remember.
-        int rc = ble_hid_press(HID_MOD_LSHIFT, HID_KEY_SPACE);
-        ESP_LOGI(TAG, "Shift+Space press (rc=%d)", rc);
+        // Crossed long threshold — tell the daemon to hold left Shift+Space.
+        const char* msg = "{\"cmd\":\"key_down\",\"mod\":\"shift\",\"key\":\"space\"}";
+        int rc = ble_nus_send(msg, strlen(msg));
+        ESP_LOGI(TAG, "key_down shift+space (rc=%d)", rc);
         _shift_space_held = true;
     }
 
     if (!right_pressed && _shift_space_held) {
-        int rc = ble_hid_release();
-        ESP_LOGI(TAG, "Shift+Space release (rc=%d)", rc);
+        const char* msg = "{\"cmd\":\"key_up\",\"mod\":\"shift\",\"key\":\"space\"}";
+        int rc = ble_nus_send(msg, strlen(msg));
+        ESP_LOGI(TAG, "key_up shift+space (rc=%d)", rc);
         _shift_space_held = false;
     }
 

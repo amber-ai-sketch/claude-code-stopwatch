@@ -39,6 +39,7 @@ from aiohttp import web
 
 from . import HTTP_HOST, HTTP_PORT, LOG_PATH, DEVICE_NAME_PREFIX
 from .ble import WatchBLE
+from .keyinject import key_down, key_tap, key_up
 from .protocol import (
     generic_ack,
     heartbeat,
@@ -95,6 +96,22 @@ class Daemon:
             return
 
         cmd = msg.get("cmd")
+
+        # Plan B: device-driven keystroke injection. macOS won't accept
+        # input from a BLE-HID-only device that wasn't paired through
+        # the Bluetooth UI, so the device sends NUS commands and we
+        # inject Quartz events here. Same input pipeline as the built-in
+        # keyboard from the OS's perspective.
+        if cmd == "key_tap":
+            key_tap(msg.get("mod"), msg.get("key", ""))
+            return
+        if cmd == "key_down":
+            key_down(msg.get("mod"), msg.get("key", ""))
+            return
+        if cmd == "key_up":
+            key_up(msg.get("mod"), msg.get("key", ""))
+            return
+
         if cmd in ("name", "owner", "unpair"):
             await self.ble.send(generic_ack(cmd, ok=True))
             return
