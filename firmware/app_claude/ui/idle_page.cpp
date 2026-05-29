@@ -51,7 +51,9 @@ IdlePage::IdlePage()
     _cost_label = lv_label_create(_screen);
     lv_label_set_text(_cost_label, "$0.00");
     lv_obj_set_style_text_color(_cost_label, lv_color_white(), 0);
-    lv_obj_set_style_text_font(_cost_label, &lv_font_montserrat_48, 0);
+    // 36 is the largest Montserrat enabled in this LVGL build (see
+    // CONFIG_LV_FONT_MONTSERRAT_36=y in sdkconfig).
+    lv_obj_set_style_text_font(_cost_label, &lv_font_montserrat_36, 0);
     lv_obj_align(_cost_label, LV_ALIGN_CENTER, 0, 0);
 
     // Hint underneath cost.

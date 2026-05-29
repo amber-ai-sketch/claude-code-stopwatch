@@ -7,6 +7,9 @@ ESP-IDF 装完之后,按这份清单跑一遍。每一步标了"期望看到什�
 ## 0 前置
 
 ```bash
+# ESP-IDF 的 install.sh 在 macOS 上默认不装 cmake/ninja。手动补:
+brew install cmake ninja
+
 # 让当前 shell 找到 idf.py
 . ~/esp/esp-idf/export.sh
 
@@ -14,6 +17,7 @@ ESP-IDF 装完之后,按这份清单跑一遍。每一步标了"期望看到什�
 idf.py --version    # 期望: ESP-IDF v5.5
 which idf.py        # 期望: ~/esp/esp-idf/tools/idf.py
 echo $IDF_PATH      # 期望: /Users/ym/esp/esp-idf
+which cmake ninja   # 必须都在
 ```
 
 ## 1 应用我们的 patches 到 upstream

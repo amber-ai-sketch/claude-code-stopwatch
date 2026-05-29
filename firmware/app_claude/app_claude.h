@@ -14,13 +14,14 @@
  * (close() is wired to a no-op, IMU/touch quit gestures are disabled).
  */
 #pragma once
+#include "ui/idle_page.h"
 #include <apps/common/key_manager/key_manager.h>
 #include <mooncake.h>
 #include <memory>
 
+// Forward declaration for types that don't appear in unique_ptr members yet.
 namespace clawd_watch {
 class StateMachine;
-class IdlePage;
 }  // namespace clawd_watch
 
 class AppClaude : public mooncake::AppAbility {

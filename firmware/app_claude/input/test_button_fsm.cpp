@@ -1,7 +1,9 @@
 // Host-side smoke test for ButtonFsm. Build:
 //   c++ -std=c++17 -I.. test_button_fsm.cpp button_fsm.cpp -o /tmp/btn_test
 //   /tmp/btn_test
-// Not part of the firmware build.
+// Not part of the firmware build — ESP_PLATFORM gate excludes it from
+// ESP-IDF compilation since main/CMakeLists.txt uses GLOB_RECURSE.
+#ifndef ESP_PLATFORM
 #include "button_fsm.h"
 #include <stdio.h>
 #include <assert.h>
@@ -145,3 +147,4 @@ int main() {
     printf("\n%d passed, %d failed\n", passed, failed);
     return failed == 0 ? 0 : 1;
 }
+#endif  // !ESP_PLATFORM
