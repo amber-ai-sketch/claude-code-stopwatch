@@ -1,0 +1,36 @@
+diff --git a/sdkconfig.defaults b/sdkconfig.defaults
+index 693e09a..cfa6691 100644
+--- a/sdkconfig.defaults
++++ b/sdkconfig.defaults
+@@ -30,3 +30,31 @@ CONFIG_LV_USE_TJPGD=y
+ CONFIG_LV_USE_DEMO_BENCHMARK=y
+ CONFIG_LV_USE_DEMO_STRESS=y
+ CONFIG_LV_USE_DEMO_SMARTWATCH=y
++
++# ─── BLE / NimBLE (clawd-watch) ──────────────────────────────────────
++# Enable Bluetooth and use NimBLE (smaller than Bluedroid, BLE-only).
++CONFIG_BT_ENABLED=y
++CONFIG_BT_NIMBLE_ENABLED=y
++CONFIG_BT_CONTROLLER_ENABLED=y
++
++# Peripheral role only — we never connect outbound.
++CONFIG_BT_NIMBLE_ROLE_PERIPHERAL=y
++CONFIG_BT_NIMBLE_ROLE_BROADCASTER=y
++# CONFIG_BT_NIMBLE_ROLE_CENTRAL is not set
++# CONFIG_BT_NIMBLE_ROLE_OBSERVER is not set
++
++# Security: LE Secure Connections + MITM + bonding (passkey on display).
++CONFIG_BT_NIMBLE_SM_SC=y
++CONFIG_BT_NIMBLE_SM_LEGACY=y
++CONFIG_BT_NIMBLE_BONDING=y
++CONFIG_BT_NIMBLE_MAX_BONDS=3
++
++# Larger MTU so heartbeat JSON fits in one notify.
++CONFIG_BT_NIMBLE_ATT_PREFERRED_MTU=255
++
++# Stack tuning — single connection is plenty for clawd-watch.
++CONFIG_BT_NIMBLE_MAX_CONNECTIONS=1
++CONFIG_BT_NIMBLE_HOST_TASK_STACK_SIZE=4096
++
++# Pixel pet GIF on the idle page (bufo from claude-desktop-buddy).
++CONFIG_LV_USE_GIF=y

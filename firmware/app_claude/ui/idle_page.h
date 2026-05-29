@@ -3,14 +3,16 @@
  * SPDX-License-Identifier: MIT
  *
  * Idle page — what the watch shows when connected to the daemon but no
- * tool is running. M2 placeholder: model name + cost + 5h/7d arcs.
+ * tool is running. Pixel pet (bufo GIF) center stage, cost + rates as
+ * peripheral readouts.
  *
  * Field source: heartbeat JSON from clawd-watch-daemon
- *   model  → big text top
- *   cost   → big number center
+ *   pet    → looping GIF center
+ *   model  → text top
+ *   cost   → number bottom
  *   r5h    → arc top-right (green→red as % climbs)
  *   r7d    → arc bottom-right
- *   ctx    → arc bottom (context window remaining)
+ *   ctx    → arc bottom-left (context window remaining)
  *
  * Round-screen note: the AMOLED is 466×466 physical, so widgets near the
  * corners get clipped. Center the important data; arcs and rings work
@@ -42,6 +44,7 @@ public:
 
 private:
     lv_obj_t* _screen      = nullptr;
+    lv_obj_t* _pet_gif     = nullptr;  // looping bufo idle animation
     lv_obj_t* _model_label = nullptr;
     lv_obj_t* _cost_label  = nullptr;
     lv_obj_t* _arc_5h      = nullptr;

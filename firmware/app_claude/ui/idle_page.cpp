@@ -6,6 +6,9 @@
 #include <hal/hal.h>
 #include <stdio.h>
 
+// Bufo idle GIF, embedded as a raw LVGL image (assets/bufo_idle_gif.c).
+LV_IMAGE_DECLARE(bufo_idle_gif);
+
 namespace clawd_watch {
 
 namespace {
@@ -41,26 +44,33 @@ IdlePage::IdlePage()
     _screen = lv_obj_create(NULL);
     lv_obj_set_style_bg_color(_screen, lv_color_black(), 0);
 
+    // Pixel pet center stage — bufo idle GIF, looping. Scaled up 2x from
+    // its native 96x100 so it reads on the 466 round screen (~192x200,
+    // well inside the 380 safe circle).
+    _pet_gif = lv_gif_create(_screen);
+    lv_gif_set_src(_pet_gif, &bufo_idle_gif);
+    lv_image_set_scale(_pet_gif, 512);  // 256 = 1x, so 512 = 2x
+    lv_obj_align(_pet_gif, LV_ALIGN_CENTER, 0, 0);
+
     // Model name top.
     _model_label = lv_label_create(_screen);
     lv_label_set_text(_model_label, "—");
     lv_obj_set_style_text_color(_model_label, lv_color_white(), 0);
-    lv_obj_align(_model_label, LV_ALIGN_TOP_MID, 0, 80);
+    lv_obj_align(_model_label, LV_ALIGN_TOP_MID, 0, 70);
 
-    // Cost (big) center.
+    // Cost: small readout at the bottom (demoted from center to make room
+    // for the pet). montserrat_24 stays legible without dominating.
     _cost_label = lv_label_create(_screen);
     lv_label_set_text(_cost_label, "$0.00");
     lv_obj_set_style_text_color(_cost_label, lv_color_white(), 0);
-    // 36 is the largest Montserrat enabled in this LVGL build (see
-    // CONFIG_LV_FONT_MONTSERRAT_36=y in sdkconfig).
-    lv_obj_set_style_text_font(_cost_label, &lv_font_montserrat_36, 0);
-    lv_obj_align(_cost_label, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_set_style_text_font(_cost_label, &lv_font_montserrat_24, 0);
+    lv_obj_align(_cost_label, LV_ALIGN_BOTTOM_MID, 0, -70);
 
-    // Hint underneath cost.
+    // Hint just under the model name.
     _hint_label = lv_label_create(_screen);
     lv_label_set_text(_hint_label, "no sessions");
     lv_obj_set_style_text_color(_hint_label, lv_color_make(0x80, 0x80, 0x80), 0);
-    lv_obj_align(_hint_label, LV_ALIGN_CENTER, 0, 50);
+    lv_obj_align(_hint_label, LV_ALIGN_TOP_MID, 0, 100);
 
     // Three arcs: 5h, 7d, ctx.
     make_rate_arc(_screen, &_arc_5h,
