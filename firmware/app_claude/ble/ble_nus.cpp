@@ -5,6 +5,7 @@
  * NimBLE-based NUS server. Single connection, peripheral role.
  */
 #include "ble_nus.h"
+#include "ble_hid.h"
 
 #include "esp_log.h"
 #include "nvs_flash.h"
@@ -155,11 +156,29 @@ static void start_advertising(void)
     //   - scan response   : complete device name (≤29B for 31B max)
     // The Mac daemon scans by NUS UUID first, name second, so this
     // arrangement is fine and avoids EMSGSIZE.
+    // Advertising packet (must fit in 31B):
+    //   flags (3B) + appearance (4B) + 16-bit HID UUID (4B) + name (12B)
+    //   = 23B, well under the limit.
+    //
+    // macOS picks the device's profile from the main adv packet alone.
+    // Putting only the HID service UUID + Appearance(Keyboard) in the
+    // main packet keeps macOS in pure-keyboard mode. The 128-bit NUS
+    // UUID moves to the scan response so daemon scans (which look for
+    // the NUS UUID) still match. This split also avoids the corner
+    // case where macOS sees a vendor 128-bit UUID alongside HID and
+    // gets confused about device class.
+    static const ble_uuid16_t HID_SVC_UUID = BLE_UUID16_INIT(0x1812);
     struct ble_hs_adv_fields adv = {};
     adv.flags = BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP;
-    adv.uuids128 = (ble_uuid128_t*)&NUS_SVC_UUID;
-    adv.num_uuids128 = 1;
-    adv.uuids128_is_complete = 1;
+    adv.uuids16 = (ble_uuid16_t*)&HID_SVC_UUID;
+    adv.num_uuids16 = 1;
+    adv.uuids16_is_complete = 1;
+    adv.appearance = 0x03C1;  // Keyboard
+    adv.appearance_is_present = 1;
+    const char* name = ble_svc_gap_device_name();
+    adv.name = (uint8_t*)name;
+    adv.name_len = strlen(name);
+    adv.name_is_complete = 1;
 
     int rc = ble_gap_adv_set_fields(&adv);
     if (rc != 0) {
@@ -167,21 +186,26 @@ static void start_advertising(void)
         return;
     }
 
+    // Scan response carries the NUS 128-bit UUID for daemon discovery.
     struct ble_hs_adv_fields rsp = {};
-    const char* name = ble_svc_gap_device_name();
-    rsp.name = (uint8_t*)name;
-    rsp.name_len = strlen(name);
-    rsp.name_is_complete = 1;
+    rsp.uuids128 = (ble_uuid128_t*)&NUS_SVC_UUID;
+    rsp.num_uuids128 = 1;
+    rsp.uuids128_is_complete = 1;
     rc = ble_gap_adv_rsp_set_fields(&rsp);
     if (rc != 0) {
         ESP_LOGE(TAG, "ble_gap_adv_rsp_set_fields rc=%d", rc);
-        // Non-fatal: continue advertising without scan response.
     }
 
     struct ble_gap_adv_params adv_params = {};
     adv_params.conn_mode = BLE_GAP_CONN_MODE_UND;
     adv_params.disc_mode = BLE_GAP_DISC_MODE_GEN;
-    rc = ble_gap_adv_start(BLE_OWN_ADDR_PUBLIC, nullptr, BLE_HS_FOREVER,
+    // Fast advertising interval (~30ms) so macOS Bluetooth UI sees us
+    // promptly during discovery. NimBLE units are 0.625ms.
+    adv_params.itvl_min = 0x30;  // 30 ms
+    adv_params.itvl_max = 0x60;  // 60 ms
+    // Use the random address we generated in on_sync(). Switching from
+    // PUBLIC to RANDOM also matters for macOS to forget the old cache.
+    rc = ble_gap_adv_start(BLE_OWN_ADDR_RANDOM, nullptr, BLE_HS_FOREVER,
                            &adv_params, gap_event_handler, nullptr);
     if (rc != 0) {
         ESP_LOGE(TAG, "ble_gap_adv_start rc=%d", rc);
@@ -196,7 +220,15 @@ static int gap_event_handler(struct ble_gap_event* event, void* /*arg*/)
     case BLE_GAP_EVENT_CONNECT:
         if (event->connect.status == 0) {
             s_conn_handle = event->connect.conn_handle;
+            ble_hid_set_conn(s_conn_handle);
             ESP_LOGI(TAG, "connected; handle=%d", s_conn_handle);
+            // macOS only treats us as a real HID device once the link is
+            // encrypted. Force pairing immediately so the user gets the
+            // passkey prompt and the device shows up under Settings →
+            // Bluetooth as a Keyboard. ble_gap_security_initiate is a
+            // no-op if a bond is already cached.
+            int srv = ble_gap_security_initiate(event->connect.conn_handle);
+            ESP_LOGI(TAG, "security_initiate rc=%d", srv);
         } else {
             ESP_LOGW(TAG, "connect failed; status=%d", event->connect.status);
             start_advertising();
@@ -206,6 +238,7 @@ static int gap_event_handler(struct ble_gap_event* event, void* /*arg*/)
     case BLE_GAP_EVENT_DISCONNECT:
         ESP_LOGI(TAG, "disconnected; reason=%d", event->disconnect.reason);
         s_conn_handle = 0xffff;
+        ble_hid_set_conn(0xffff);
         s_tx_subscribed = false;
         s_current_passkey = 0;
         s_rx_len = 0;
@@ -216,6 +249,10 @@ static int gap_event_handler(struct ble_gap_event* event, void* /*arg*/)
         if (event->subscribe.attr_handle == s_tx_attr_handle) {
             s_tx_subscribed = event->subscribe.cur_notify;
             ESP_LOGI(TAG, "TX subscribed=%d", (int)s_tx_subscribed);
+        } else {
+            // Forward HID Input Report subscriptions.
+            ble_hid_on_subscribe(event->subscribe.attr_handle,
+                                 event->subscribe.cur_notify);
         }
         break;
 
@@ -267,11 +304,19 @@ static int gap_event_handler(struct ble_gap_event* event, void* /*arg*/)
 
 static void on_sync(void)
 {
-    int rc = ble_hs_util_ensure_addr(0);
-    if (rc != 0) {
-        ESP_LOGE(TAG, "ensure_addr rc=%d", rc);
-        return;
-    }
+    // Generate a fresh random non-resolvable address each boot. macOS
+    // caches BLE addresses it has seen via CoreBluetooth without going
+    // through the user-pairing UI. A new address forces it to treat the
+    // device as never-seen, so the system Bluetooth picker can drive a
+    // proper pair flow.
+    ble_addr_t addr;
+    int rc = ble_hs_id_gen_rnd(0, &addr);
+    if (rc != 0) ESP_LOGE(TAG, "gen_rnd rc=%d", rc);
+    rc = ble_hs_id_set_rnd(addr.val);
+    if (rc != 0) ESP_LOGE(TAG, "set_rnd rc=%d", rc);
+
+    rc = ble_hs_util_ensure_addr(0);
+    if (rc != 0) ESP_LOGE(TAG, "ensure_addr rc=%d", rc);
     start_advertising();
 }
 
@@ -361,9 +406,17 @@ void ble_nus_init(void)
     ble_svc_gatt_init();
 
     rc = ble_gatts_count_cfg(s_svc_defs);
-    if (rc != 0) ESP_LOGE(TAG, "gatts_count_cfg rc=%d", rc);
+    if (rc != 0) ESP_LOGE(TAG, "gatts_count_cfg(NUS) rc=%d", rc);
     rc = ble_gatts_add_svcs(s_svc_defs);
-    if (rc != 0) ESP_LOGE(TAG, "gatts_add_svcs rc=%d", rc);
+    if (rc != 0) ESP_LOGE(TAG, "gatts_add_svcs(NUS) rc=%d", rc);
+
+    // Register HID services in the same connection so Mac sees a
+    // dual-profile device (NUS + standard keyboard).
+    const struct ble_gatt_svc_def* hid_svcs = ble_hid_service_defs();
+    rc = ble_gatts_count_cfg(hid_svcs);
+    if (rc != 0) ESP_LOGE(TAG, "gatts_count_cfg(HID) rc=%d", rc);
+    rc = ble_gatts_add_svcs(hid_svcs);
+    if (rc != 0) ESP_LOGE(TAG, "gatts_add_svcs(HID) rc=%d", rc);
 
     // Note: ble_store_config_init() persists bonds across reboots, but
     // ESP-IDF's NimBLE port does not always expose it as a public symbol

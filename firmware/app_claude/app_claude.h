@@ -15,6 +15,7 @@
  */
 #pragma once
 #include "ble/watch_state.h"
+#include "input/hid_dispatcher.h"
 #include "ui/idle_page.h"
 #include <apps/common/key_manager/key_manager.h>
 #include <mooncake.h>
@@ -49,4 +50,7 @@ private:
     // We refresh the LVGL idle page from these on each onRunning() tick.
     clawd_watch::WatchState _state;
     uint32_t _last_ui_apply_ms = 0;
+
+    // M5 HID input: button → HID keycode dispatcher.
+    clawd_watch::HidDispatcher _hid;
 };
