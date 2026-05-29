@@ -14,6 +14,7 @@
  * (close() is wired to a no-op, IMU/touch quit gestures are disabled).
  */
 #pragma once
+#include "ble/watch_state.h"
 #include "ui/idle_page.h"
 #include <apps/common/key_manager/key_manager.h>
 #include <mooncake.h>
@@ -43,4 +44,9 @@ private:
 
     // Last time we ticked stale state etc.
     uint32_t _last_tick_ms = 0;
+
+    // Live state, fed by the NUS rx callback (which runs on a NimBLE task).
+    // We refresh the LVGL idle page from these on each onRunning() tick.
+    clawd_watch::WatchState _state;
+    uint32_t _last_ui_apply_ms = 0;
 };
