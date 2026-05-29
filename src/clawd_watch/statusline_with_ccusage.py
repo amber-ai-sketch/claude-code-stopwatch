@@ -9,7 +9,7 @@ wrapper:
     slow the CLI down
 
 Configured via ~/.claude/settings.json:
-  statusLine.command = "/Users/ym/.local/bin/clawd-statusline-tee"
+  statusLine.command = "~/.local/bin/clawd-statusline-tee"
 
 We don't shell out to bash / pipes here — the parent statusLine already
 has its sed filter chained, so this wrapper drops INTO that chain. To

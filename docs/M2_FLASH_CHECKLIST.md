@@ -16,7 +16,7 @@ brew install cmake ninja
 # 验证
 idf.py --version    # 期望: ESP-IDF v5.5
 which idf.py        # 期望: ~/esp/esp-idf/tools/idf.py
-echo $IDF_PATH      # 期望: /Users/ym/esp/esp-idf
+echo $IDF_PATH      # 期望: ~/esp/esp-idf
 which cmake ninja   # 必须都在
 ```
 
