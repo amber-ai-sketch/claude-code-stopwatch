@@ -13,10 +13,11 @@ dependencies = [
 ]
 
 [project.scripts]
-clawd-watch-daemon = "clawd_watch.daemon:main"
-clawd-watch-hook   = "clawd_watch.hook:main"
-clawd-watch        = "clawd_watch.cli:main"
-clawd-statusline   = "clawd_watch.statusline:main"
+clawd-watch-daemon    = "clawd_watch.daemon:main"
+clawd-watch-hook      = "clawd_watch.hook:main"
+clawd-watch           = "clawd_watch.cli:main"
+clawd-statusline      = "clawd_watch.statusline:main"
+clawd-statusline-tee  = "clawd_watch.statusline_with_ccusage:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
