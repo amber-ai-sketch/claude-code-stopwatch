@@ -10,13 +10,11 @@ Title icon:  🟢 connected   🔴 disconnected   🟡 scanning   ⚪ daemon dow
 """
 from __future__ import annotations
 
-import json
 import os
 import subprocess
 import sys
 import threading
 import urllib.error
-import urllib.request
 
 import rumps
 
@@ -31,23 +29,21 @@ class ClawdWatchMenuBar(rumps.App):
     def __init__(self) -> None:
         super().__init__("Clawd", title="⚪ Clawd", quit_button="退出")
 
-        # Disabled rows that just display state, refreshed each poll.
+        # Status rows (read-only, refreshed each poll).
         self._link_row = rumps.MenuItem("启动中…")
         self._addr_row = rumps.MenuItem("")
-        self._cost_row = rumps.MenuItem("")
-        self._ctx_row = rumps.MenuItem("")
-        self._nearby = rumps.MenuItem("附近设备")
+        self._info_row = rumps.MenuItem("")   # model + cost, combined
+        self._ctx_row = rumps.MenuItem("")    # context % + rate limits
 
-        # Button mode toggle. Two checkable rows; the active one is ticked on
-        # each poll from /status. "trigger" = watch is a remote that fires Mac
-        # WeChat dictation; "mic" = on-device mic recording (phase 2).
-        self._mode_trigger = rumps.MenuItem("遥控器（微信听写）",
-                                            callback=self._on_mode_trigger)
-        self._mode_mic = rumps.MenuItem("录音（手表麦克风）",
-                                        callback=self._on_mode_mic)
+        # Mode toggle.
+        self._mode_trigger = rumps.MenuItem("遥控器", callback=self._on_mode_trigger)
+        self._mode_mic = rumps.MenuItem("录音", callback=self._on_mode_mic)
         self._mode_menu = rumps.MenuItem("模式")
         self._mode_menu.add(self._mode_trigger)
         self._mode_menu.add(self._mode_mic)
+
+        # Nearby devices submenu.
+        self._nearby = rumps.MenuItem("附近设备")
 
         self.menu = [
             self._link_row,
@@ -55,22 +51,20 @@ class ClawdWatchMenuBar(rumps.App):
             None,
             self._mode_menu,
             None,
-            self._cost_row,
+            self._info_row,
             self._ctx_row,
             None,
-            rumps.MenuItem("🔍 扫描附近设备…", callback=self._on_scan),
+            rumps.MenuItem("扫描附近设备…", callback=self._on_scan),
             self._nearby,
-            rumps.MenuItem("🔌 重新连接", callback=self._on_reconnect),
-            rumps.MenuItem("🗑 忘记此设备", callback=self._on_forget),
-            rumps.MenuItem("↻ 重启后台服务", callback=self._on_restart),
-            rumps.MenuItem("📜 查看日志", callback=self._on_logs),
-            None,
+            rumps.MenuItem("重新连接", callback=self._on_reconnect),
+            rumps.MenuItem("忘记此设备", callback=self._on_forget),
+            rumps.MenuItem("重启后台服务", callback=self._on_restart),
+            rumps.MenuItem("查看日志", callback=self._on_logs),
         ]
 
-        # Set by the scan thread, consumed on the next poll tick so all AppKit
-        # menu mutation stays on the main thread.
+        # Set by the scan worker thread, consumed on the next poll tick.
         self._scan_result: list | None = None
-        self._scanning = False
+        self._scan_done = False  # explicit handoff flag (thread-safe pattern)
 
         rumps.Timer(self._poll, POLL_SECONDS).start()
 
@@ -85,36 +79,45 @@ class ClawdWatchMenuBar(rumps.App):
             status = daemon_get("/status", timeout=2.0)
         except (urllib.error.URLError, OSError):
             self.title = "⚪ Clawd"
-            self._link_row.title = "后台服务未运行"
-            self._addr_row.title = "点「重启后台服务」试试"
-            self._cost_row.title = ""
+            self._link_row.title = "服务未运行"
+            self._addr_row.title = "选择「重启后台服务」"
+            self._info_row.title = "—"
             self._ctx_row.title = ""
             return
 
         connected = status.get("connected", False)
-        if self._scanning:
+        if self._scan_done:
             self.title = "🟡 Clawd"
+            self._scan_done = False
         else:
             self.title = "🟢 Clawd" if connected else "🔴 Clawd"
 
         if connected:
             self._link_row.title = f"● 已连接  {status.get('device_name') or '设备'}"
         else:
-            self._link_row.title = "○ 未连接 — 正在后台重试…"
+            self._link_row.title = "○ 未连接 — 重试中…"
 
         address = status.get("address")
         self._addr_row.title = f"地址 …{address[-8:]}" if address else "未保存设备"
 
+        # Combined info line: "model $cost" or just "model" or "—".
         sl = status.get("statusline") or {}
-        bits = []
+        parts = []
         if sl.get("model_name"):
-            bits.append(sl["model_name"])
+            parts.append(sl["model_name"])
         if sl.get("cost_usd") is not None:
-            bits.append(f"${sl['cost_usd']:.2f}")
-        self._cost_row.title = "  ·  ".join(bits) if bits else "暂无会话数据"
+            parts.append(f"${sl['cost_usd']:.2f}")
+        self._info_row.title = "  ".join(parts) if parts else "—"
 
+        # Context + rate limits on one line.
+        ctx_parts = []
         ctx = sl.get("context_pct")
-        self._ctx_row.title = f"上下文 {ctx:.0f}%" if ctx is not None else ""
+        if ctx is not None:
+            ctx_parts.append(f"上下文 {ctx:.0f}%")
+        r5h = sl.get("rate_5h_pct")
+        if r5h is not None:
+            ctx_parts.append(f"5h {r5h:.0f}%")
+        self._ctx_row.title = "  ·  ".join(ctx_parts) if ctx_parts else ""
 
         mode = status.get("mode", "trigger")
         self._mode_trigger.state = 1 if mode == "trigger" else 0
@@ -134,14 +137,13 @@ class ClawdWatchMenuBar(rumps.App):
         except (urllib.error.URLError, OSError) as e:
             rumps.alert("切换模式失败", str(e))
             return
-        # Reflect immediately; the next poll re-confirms from /status.
         self._mode_trigger.state = 1 if mode == "trigger" else 0
         self._mode_mic.state = 1 if mode == "mic" else 0
 
     def _on_scan(self, _sender) -> None:
-        if self._scanning:
+        if self._scan_done:
             return
-        self._scanning = True
+        self._scan_done = True
         self._nearby.title = "附近设备（扫描中…）"
         threading.Thread(target=self._scan_worker, daemon=True).start()
 
@@ -152,7 +154,6 @@ class ClawdWatchMenuBar(rumps.App):
             result = []
             print(f"scan failed: {e}", file=sys.stderr)
         self._scan_result = result
-        self._scanning = False
 
     def _render_nearby(self, devices: list) -> None:
         self._nearby.clear()
@@ -174,7 +175,6 @@ class ClawdWatchMenuBar(rumps.App):
             )
 
     def _make_connect(self, address: str):
-        # The next poll tick repaints the title icon once the link comes up.
         def _connect(_sender) -> None:
             try:
                 daemon_post("/connect", {"address": address}, timeout=5.0)

@@ -21,7 +21,7 @@
 
 namespace clawd_watch {
 
-enum class ClawdState { Working, Idle, Waiting };
+enum class ClawdState { Working, Idle, Waiting, Celebrate };
 
 class ClawdPet {
 public:

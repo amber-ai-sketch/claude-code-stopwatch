@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 #include "overview_page.h"
+#include "design_tokens.h"
 #include <stdio.h>
 
 namespace clawd_watch {
@@ -12,9 +13,6 @@ namespace {
 constexpr int kScreen = 466;
 constexpr int kCx = kScreen / 2;
 constexpr int kCy = kScreen / 2;
-
-const lv_color_t kOrange = lv_color_make(0xD9, 0x77, 0x57);
-const lv_color_t kGrey   = lv_color_make(0x8a, 0x8a, 0x8a);
 
 }  // namespace
 
@@ -62,22 +60,28 @@ OverviewPage::~OverviewPage()
     _pet.reset();
 }
 
-void OverviewPage::update(int sessions_total, int sessions_running, int sessions_waiting)
+void OverviewPage::update(int sessions_total, int sessions_running, int sessions_waiting,
+                          std::optional<ClawdState> override_state)
 {
-    // Decide state. Waiting takes priority — that's the proactive nudge.
-    ClawdState state = sessions_waiting > 0 ? ClawdState::Waiting
-                     : sessions_running > 0 ? ClawdState::Working
-                                            : ClawdState::Idle;
+    // Decide state. Override takes priority (e.g. Celebrate), then
+    // waiting > working > idle.
+    ClawdState state = override_state.value_or(
+        sessions_waiting > 0 ? ClawdState::Waiting
+      : sessions_running > 0 ? ClawdState::Working
+                             : ClawdState::Idle);
 
     // Chip text + color.
     const char* chip_text;
     lv_color_t chip_bg, chip_fg;
     if (state == ClawdState::Waiting) {
-        chip_text = "your turn"; chip_fg = kOrange;
-        chip_bg = lv_color_make(0x33, 0x22, 0x1a);
+        chip_text = "your turn"; chip_fg = kAmber;
+        chip_bg = kChipBgWaiting;
     } else if (state == ClawdState::Working) {
         chip_text = "working"; chip_fg = kOrange;
-        chip_bg = lv_color_make(0x33, 0x22, 0x1a);
+        chip_bg = kChipBgWorking;
+    } else if (state == ClawdState::Celebrate) {
+        chip_text = "done!"; chip_fg = lv_color_make(0x88, 0xDD, 0x66);
+        chip_bg = lv_color_make(0x22, 0x33, 0x11);
     } else {
         chip_text = "idle"; chip_fg = kGrey;
         chip_bg = lv_color_make(0x22, 0x22, 0x22);
@@ -86,15 +90,22 @@ void OverviewPage::update(int sessions_total, int sessions_running, int sessions
     lv_obj_set_style_text_color(_chip_label, chip_fg, 0);
     lv_obj_set_style_bg_color(_chip, chip_bg, 0);
 
-    // Count + subtitle.
+    // Count + subtitle. When waiting, show the waiting count prominently
+    // so the user knows how many sessions need attention.
     char buf[24];
-    snprintf(buf, sizeof(buf), "%d / %d", sessions_running, sessions_total);
-    lv_label_set_text(_count, buf);
-    lv_label_set_text(_count_sub,
-        sessions_waiting > 0 ? "needs you"
-      : sessions_running > 0 ? "running"
-      : sessions_total > 0   ? "idle"
-                             : "no sessions");
+    if (sessions_waiting > 0) {
+        snprintf(buf, sizeof(buf), "%d", sessions_waiting);
+        lv_label_set_text(_count, buf);
+        lv_label_set_text(_count_sub,
+            sessions_waiting == 1 ? "needs you" : "need you");
+    } else {
+        snprintf(buf, sizeof(buf), "%d / %d", sessions_running, sessions_total);
+        lv_label_set_text(_count, buf);
+        lv_label_set_text(_count_sub,
+            sessions_running > 0 ? "running"
+          : sessions_total > 0   ? "idle"
+                                 : "no sessions");
+    }
 
     // Only restart the pet animation when the state actually changes —
     // re-seeding every 200ms would reset its phase and look jittery.

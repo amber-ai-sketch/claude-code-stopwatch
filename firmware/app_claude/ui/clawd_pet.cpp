@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 #include "clawd_pet.h"
+#include "design_tokens.h"
 
 namespace clawd_watch {
 
@@ -23,9 +24,7 @@ constexpr int kEyeW = 22, kEyeY = 22;
 constexpr int kEyeLX = 50, kEyeRX = 120;
 constexpr int kEyeLineH = 6, kEyeLineY = 34;  // idle: sleepy eye-lines
 
-const lv_color_t kOrange    = lv_color_make(0xD9, 0x77, 0x57);
-const lv_color_t kOrangeDim = lv_color_make(0x9c, 0x6b, 0x56);
-const lv_color_t kDark      = lv_color_make(0x0d, 0x0d, 0x0d);
+const lv_color_t kDark = lv_color_make(0x0d, 0x0d, 0x0d);
 
 lv_obj_t* make_rect(lv_obj_t* parent, int x, int y, int w, int h, lv_color_t color)
 {
@@ -119,9 +118,11 @@ void ClawdPet::set_state(ClawdState state)
 
     // Slow, eased oscillation. Durations are long on purpose — peace, not
     // urgency. waiting is the gentlest "hello", not an alarm.
-    uint32_t dur = (state == ClawdState::Working) ? 1800
-                 : (state == ClawdState::Idle)    ? 2000
-                                                  : 1500;  // waiting (one way)
+    // Celebrate is a quick one-shot bounce (no repeat).
+    uint32_t dur = (state == ClawdState::Working)   ? 1800
+                 : (state == ClawdState::Idle)      ? 2000
+                 : (state == ClawdState::Celebrate)  ? 600
+                                                     : 1500;  // waiting
 
     lv_anim_t a;
     lv_anim_init(&a);
@@ -129,9 +130,15 @@ void ClawdPet::set_state(ClawdState state)
     lv_anim_set_exec_cb(&a, clawd_tick);
     lv_anim_set_values(&a, 0, 1000);
     lv_anim_set_duration(&a, dur);
-    lv_anim_set_playback_duration(&a, dur);            // oscillate back
-    lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
     lv_anim_set_path_cb(&a, lv_anim_path_ease_in_out);
+    if (state == ClawdState::Celebrate) {
+        // One-shot bounce: play forward then back, then stop.
+        lv_anim_set_playback_duration(&a, dur);
+        lv_anim_set_repeat_count(&a, 1);
+    } else {
+        lv_anim_set_playback_duration(&a, dur);
+        lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+    }
     lv_anim_start(&a);
 }
 
@@ -172,6 +179,18 @@ void ClawdPet::apply_phase(float t)
         lv_obj_set_y(_eyeR, kEyeY + lift);
         lv_obj_set_y(_clawR, kClawY + lift);
         lv_obj_set_y(_clawL, kClawYRaised + lift + (int)(-4.0f * t));
+        break;
+    }
+    case ClawdState::Celebrate: {
+        // Happy bounce: whole body jumps up, both claws raised, legs tuck.
+        int jump = (int)(-12.0f * t);
+        lv_obj_set_y(_body, kBodyY + jump);
+        lv_obj_set_y(_eyeL, kEyeY + jump);
+        lv_obj_set_y(_eyeR, kEyeY + jump);
+        lv_obj_set_y(_clawL, kClawYRaised + jump);
+        lv_obj_set_y(_clawR, kClawYRaised + jump);
+        for (int i = 0; i < 4; i++)
+            lv_obj_set_y(_legs[i], kLegY + (int)(3.0f * t));
         break;
     }
     }

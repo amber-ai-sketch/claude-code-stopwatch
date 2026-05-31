@@ -17,6 +17,7 @@
 #pragma once
 #include <lvgl.h>
 #include <memory>
+#include <optional>
 #include "clawd_pet.h"
 
 namespace clawd_watch {
@@ -26,7 +27,8 @@ public:
     explicit OverviewPage(lv_obj_t* parent);
     ~OverviewPage();
 
-    void update(int sessions_total, int sessions_running, int sessions_waiting);
+    void update(int sessions_total, int sessions_running, int sessions_waiting,
+                std::optional<ClawdState> override_state = std::nullopt);
 
 private:
     lv_obj_t* _ring       = nullptr;  // soft breathing arc (working/waiting)

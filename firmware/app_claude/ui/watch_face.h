@@ -47,6 +47,7 @@ private:
     std::vector<lv_obj_t*> _session_tiles;  // parent tile per session page
 
     int _session_tile_count = -1;           // -1 = not built yet
+    int _prev_running = 0;                  // for celebration detection
 };
 
 }  // namespace clawd_watch

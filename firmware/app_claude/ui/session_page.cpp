@@ -3,6 +3,7 @@
  * SPDX-License-Identifier: MIT
  */
 #include "session_page.h"
+#include "design_tokens.h"
 #include <stdio.h>
 
 namespace clawd_watch {
@@ -10,10 +11,6 @@ namespace clawd_watch {
 namespace {
 
 constexpr int kScreen = 466;
-
-const lv_color_t kOrange = lv_color_make(0xD9, 0x77, 0x57);
-const lv_color_t kGrey   = lv_color_make(0x8a, 0x8a, 0x8a);
-const lv_color_t kDim    = lv_color_make(0x7a, 0x7a, 0x7a);
 
 // Static caption under each token value, in grid order.
 const char* kTokLabels[4] = {"INPUT", "OUTPUT", "CACHE HIT", "CACHE WRITE"};
@@ -54,7 +51,7 @@ SessionPage::SessionPage(lv_obj_t* parent)
     lv_obj_remove_style(_ring, NULL, LV_PART_KNOB);
     lv_obj_set_style_arc_width(_ring, 12, LV_PART_MAIN);
     lv_obj_set_style_arc_width(_ring, 12, LV_PART_INDICATOR);
-    lv_obj_set_style_arc_color(_ring, lv_color_make(0x1f, 0x18, 0x14), LV_PART_MAIN);
+    lv_obj_set_style_arc_color(_ring, kArcTrack, LV_PART_MAIN);
     lv_obj_set_style_arc_color(_ring, kOrange, LV_PART_INDICATOR);
     lv_obj_remove_flag(_ring, LV_OBJ_FLAG_CLICKABLE);
 
@@ -138,11 +135,11 @@ void SessionPage::update(int ordinal, int count,
     const char* chip_text;
     lv_color_t chip_bg, chip_fg;
     if (state == ClawdState::Waiting) {
-        chip_text = "your turn"; chip_fg = kOrange;
-        chip_bg = lv_color_make(0x33, 0x22, 0x1a);
+        chip_text = "your turn"; chip_fg = kAmber;
+        chip_bg = kChipBgWaiting;
     } else if (state == ClawdState::Working) {
         chip_text = "working"; chip_fg = kOrange;
-        chip_bg = lv_color_make(0x33, 0x22, 0x1a);
+        chip_bg = kChipBgWorking;
     } else {
         chip_text = "idle"; chip_fg = kGrey;
         chip_bg = lv_color_make(0x22, 0x22, 0x22);
@@ -152,7 +149,15 @@ void SessionPage::update(int ordinal, int count,
     lv_obj_set_style_bg_color(_chip, chip_bg, 0);
 
     // Context ring (silent — no numeric readout).
-    lv_arc_set_value(_ring, ctx_pct >= 0.0f ? (int32_t)ctx_pct : 0);
+    // When context is unknown (negative), dim the ring to distinguish
+    // "no data" from "0% full".
+    if (ctx_pct >= 0.0f) {
+        lv_arc_set_value(_ring, (int32_t)ctx_pct);
+        lv_obj_set_style_arc_color(_ring, kOrange, LV_PART_INDICATOR);
+    } else {
+        lv_arc_set_value(_ring, 0);
+        lv_obj_set_style_arc_color(_ring, kArcUnknown, LV_PART_INDICATOR);
+    }
 
     // Token grid.
     const int32_t toks[4] = {input_tokens, output_tokens,

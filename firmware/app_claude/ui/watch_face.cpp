@@ -3,14 +3,14 @@
  * SPDX-License-Identifier: MIT
  */
 #include "watch_face.h"
+#include "design_tokens.h"
 #include <stdio.h>
 
 namespace clawd_watch {
 
 namespace {
 
-const lv_color_t kOrange   = lv_color_make(0xD9, 0x77, 0x57);
-const lv_color_t kDotOff   = lv_color_make(0x3a, 0x3a, 0x3a);
+const lv_color_t kDotOff = lv_color_make(0x3a, 0x3a, 0x3a);
 constexpr int kDot   = 7;    // dot diameter
 constexpr int kDotGap = 9;   // center-to-center step
 constexpr int kPagerY = 36;  // distance from bottom
@@ -127,7 +127,14 @@ void WatchFace::apply(const WatchState& state)
     int running = state.sessions_running;
     int waiting = state.sessions_waiting;
 
-    _overview->update(total, running, waiting);
+    // Celebration: when running drops from >0 to 0 and nothing is waiting,
+    // briefly show a happy bounce before settling into idle.
+    if (_prev_running > 0 && running == 0 && waiting == 0) {
+        _overview->update(total, 0, 0, ClawdState::Celebrate);
+    } else {
+        _overview->update(total, running, waiting);
+    }
+    _prev_running = running;
 
     // (Re)build session tiles to match how many sessions the daemon
     // actually described (session_details may be capped below `total`).
