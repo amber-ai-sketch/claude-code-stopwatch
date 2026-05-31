@@ -13,7 +13,7 @@ const lv_color_t kOrange   = lv_color_make(0xD9, 0x77, 0x57);
 const lv_color_t kDotOff   = lv_color_make(0x3a, 0x3a, 0x3a);
 constexpr int kDot   = 7;    // dot diameter
 constexpr int kDotGap = 9;   // center-to-center step
-constexpr int kPagerY = 30;  // distance from bottom
+constexpr int kPagerY = 36;  // distance from bottom
 
 }  // namespace
 
@@ -143,10 +143,15 @@ void WatchFace::apply(const WatchState& state)
                                   : ClawdState::Idle;
         _sessions[i]->update(
             i + 1, n, st,
+            s.project,
             s.model,
             s.context_valid ? s.context_pct : -1.0f,
             s.cost_valid ? s.cost_usd : -1.0f,
-            s.tool);
+            s.tool,
+            s.input_tokens,
+            s.output_tokens,
+            s.cache_read_tokens,
+            s.cache_create_tokens);
     }
 }
 
