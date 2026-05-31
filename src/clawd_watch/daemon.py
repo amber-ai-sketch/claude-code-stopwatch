@@ -345,7 +345,9 @@ class Daemon:
         snapshot = {
             k: p.get(k)
             for k in ("session_id", "cost_usd", "context_pct", "rate_5h_pct",
-                      "rate_7d_pct", "model_name")
+                      "rate_7d_pct", "model_name", "project",
+                      "input_tokens", "output_tokens",
+                      "cache_read_tokens", "cache_create_tokens")
             if p.get(k) is not None
         }
         self.state.update_statusline(snapshot)

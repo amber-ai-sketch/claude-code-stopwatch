@@ -71,8 +71,10 @@ static ble_nus_rx_line_cb s_rx_cb = nullptr;
 static void*              s_rx_user = nullptr;
 
 // Line accumulator for inbound writes. NUS is a stream, daemon may
-// fragment a single JSON line across multiple writes.
-static char     s_rx_buf[1024];
+// fragment a single JSON line across multiple writes. Sized for the
+// largest heartbeat: 8 sessions (MAX_DEVICE_SESSIONS) each carrying
+// token/cache detail is ~1.4 KB, so 2 KB leaves headroom.
+static char     s_rx_buf[2048];
 static size_t   s_rx_len = 0;
 
 // ─── Helpers ─────────────────────────────────────────────────────────
