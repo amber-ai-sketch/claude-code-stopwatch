@@ -26,33 +26,33 @@ OverviewPage::OverviewPage(lv_obj_t* parent)
     // Status chip (rounded pill) near the top.
     _chip = lv_obj_create(parent);
     lv_obj_remove_style_all(_chip);
-    lv_obj_set_style_radius(_chip, 18, 0);
+    lv_obj_set_style_radius(_chip, 20, 0);
     lv_obj_set_style_bg_opa(_chip, LV_OPA_COVER, 0);
-    lv_obj_set_style_pad_hor(_chip, 16, 0);
-    lv_obj_set_style_pad_ver(_chip, 6, 0);
+    lv_obj_set_style_pad_hor(_chip, 18, 0);
+    lv_obj_set_style_pad_ver(_chip, 7, 0);
     lv_obj_set_size(_chip, LV_SIZE_CONTENT, LV_SIZE_CONTENT);
-    lv_obj_align(_chip, LV_ALIGN_TOP_MID, 0, 70);
+    lv_obj_align(_chip, LV_ALIGN_TOP_MID, 0, 88);
 
     _chip_label = lv_label_create(_chip);
-    lv_obj_set_style_text_font(_chip_label, &lv_font_montserrat_18, 0);
+    lv_obj_set_style_text_font(_chip_label, &lv_font_montserrat_22, 0);
     lv_label_set_text(_chip_label, "idle");
     lv_obj_center(_chip_label);
 
     // Clawd center, nudged up to leave room for the count below.
-    _pet = std::make_unique<ClawdPet>(parent, kCx, kCy - 30);
+    _pet = std::make_unique<ClawdPet>(parent, kCx, kCy - 21);
 
-    // Session tally.
+    // Session tally — hero count, large.
     _count = lv_label_create(parent);
-    lv_obj_set_style_text_font(_count, &lv_font_montserrat_36, 0);
+    lv_obj_set_style_text_font(_count, &lv_font_montserrat_44, 0);
     lv_obj_set_style_text_color(_count, lv_color_white(), 0);
     lv_label_set_text(_count, "0 / 0");
-    lv_obj_align(_count, LV_ALIGN_CENTER, 0, 120);
+    lv_obj_align(_count, LV_ALIGN_CENTER, 0, 118);
 
     _count_sub = lv_label_create(parent);
-    lv_obj_set_style_text_font(_count_sub, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_font(_count_sub, &lv_font_montserrat_20, 0);
     lv_obj_set_style_text_color(_count_sub, kGrey, 0);
     lv_label_set_text(_count_sub, "no sessions");
-    lv_obj_align(_count_sub, LV_ALIGN_CENTER, 0, 158);
+    lv_obj_align(_count_sub, LV_ALIGN_CENTER, 0, 166);
 
     update(0, 0, 0);
 }
