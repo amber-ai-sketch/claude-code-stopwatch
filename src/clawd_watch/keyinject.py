@@ -135,3 +135,16 @@ def key_up(modifier: Optional[str], key: str) -> bool:
         _post(mod_keycode, False, 0)
     log.info("key_up %s+%s", modifier or "", key)
     return True
+
+
+def release_all_modifiers() -> None:
+    """Force-release every modifier key with cleared flags.
+
+    A key_down with no matching key_up (e.g. the BLE link drops mid-press, or
+    the daemon restarts while the watch button is held) leaves Shift/Ctrl/etc
+    stuck down from macOS's view, breaking the whole keyboard. Call this on
+    disconnect so a half-finished hold can't wedge the modifier state.
+    """
+    for keycode in MOD_KEYCODES.values():
+        _post(keycode, False, 0)
+    log.info("released all modifiers")
