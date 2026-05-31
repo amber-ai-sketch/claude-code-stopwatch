@@ -66,7 +66,7 @@ static volatile uint16_t s_conn_handle = 0xffff;     // 0xffff = no connection
 static uint16_t s_tx_attr_handle = 0;
 static volatile bool     s_tx_subscribed = false;
 static uint16_t s_audio_tx_attr_handle = 0;
-static bool     s_audio_subscribed = false;
+static volatile bool     s_audio_subscribed = false;
 static volatile uint16_t s_mtu = 0;                  // negotiated ATT MTU, 0 = none
 static volatile uint32_t s_current_passkey = 0;
 

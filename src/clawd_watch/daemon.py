@@ -270,7 +270,7 @@ class Daemon:
             return json.loads(raw)
         except Exception as e:
             log.warning("bad JSON payload on %s (%d bytes): %s", req.path, len(raw), e)
-            raise web.HTTPBadRequest(text=f"invalid JSON: {e}")
+            raise web.HTTPBadRequest(text="invalid JSON body")
 
     async def _on_session_start(self, req: web.Request) -> web.Response:
         p = await self._read_payload(req)
