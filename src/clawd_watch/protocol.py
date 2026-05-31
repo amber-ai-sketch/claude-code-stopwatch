@@ -108,7 +108,8 @@ def short_hint_for_tool(tool: str, tool_input: dict[str, Any]) -> str:
     if not isinstance(tool_input, dict):
         return ""
     if tool == "Bash":
-        return (tool_input.get("command") or "").strip().splitlines()[0][:120]
+        lines = (tool_input.get("command") or "").strip().splitlines()
+        return lines[0][:120] if lines else ""
     if tool in ("Write", "Edit", "MultiEdit", "NotebookEdit"):
         return (tool_input.get("file_path") or tool_input.get("notebook_path") or "")[:120]
     if tool == "WebFetch":

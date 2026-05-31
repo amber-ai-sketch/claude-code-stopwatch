@@ -7,35 +7,17 @@ import os
 import subprocess
 import sys
 import urllib.error
-import urllib.request
 
-from . import HTTP_HOST, HTTP_PORT, LOG_PATH
+from . import LOG_PATH, HOOK_SETTINGS_TIMEOUT
+from .http_client import daemon_get, daemon_post
 
 
 PLIST_LABEL = "com.claude-code.clawd-watch"
 
 
-def _get(path: str, timeout: float = 5.0) -> dict:
-    req = urllib.request.Request(f"http://{HTTP_HOST}:{HTTP_PORT}{path}")
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read())
-
-
-def _post(path: str, payload: dict | None = None, timeout: float = 35.0) -> dict:
-    data = json.dumps(payload or {}).encode()
-    req = urllib.request.Request(
-        f"http://{HTTP_HOST}:{HTTP_PORT}{path}",
-        data=data,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read())
-
-
 def cmd_status(_args: argparse.Namespace) -> int:
     try:
-        info = _get("/status")
+        info = daemon_get("/status")
     except (urllib.error.URLError, OSError) as e:
         print(f"daemon: not reachable ({e})")
         return 1
@@ -81,7 +63,7 @@ def cmd_status(_args: argparse.Namespace) -> int:
 def cmd_test(_args: argparse.Namespace) -> int:
     print("Injecting a test approval. Press LEFT on the watch to allow, RIGHT to deny.")
     try:
-        out = _post("/test-prompt", {}, timeout=40.0)
+        out = daemon_post("/test-prompt", {}, timeout=40.0)
     except (urllib.error.URLError, OSError) as e:
         print(f"daemon: not reachable ({e})")
         return 1
@@ -99,7 +81,7 @@ def cmd_test_statusline(_args: argparse.Namespace) -> int:
         "model_name": "Opus 4.7",
     }
     try:
-        out = _post("/statusline", fake, timeout=2.0)
+        out = daemon_post("/statusline", fake, timeout=2.0)
     except (urllib.error.URLError, OSError) as e:
         print(f"daemon: not reachable ({e})")
         return 1
@@ -113,7 +95,7 @@ def cmd_voice_test(args: argparse.Namespace) -> int:
     if args.device_index is not None:
         payload["device_index"] = args.device_index
     try:
-        out = _post("/voice-test", payload, timeout=45.0)
+        out = daemon_post("/voice-test", payload, timeout=45.0)
     except urllib.error.HTTPError as e:
         print(f"voice-test rejected: {e.reason}")
         return 1
@@ -129,7 +111,7 @@ def cmd_voice_test(args: argparse.Namespace) -> int:
 
 def cmd_scan(_args: argparse.Namespace) -> int:
     try:
-        out = _get("/scan", timeout=12.0)
+        out = daemon_get("/scan", timeout=12.0)
     except (urllib.error.URLError, OSError) as e:
         print(f"daemon: not reachable ({e})")
         return 1
@@ -146,7 +128,7 @@ def cmd_scan(_args: argparse.Namespace) -> int:
 
 def cmd_reconnect(_args: argparse.Namespace) -> int:
     try:
-        out = _post("/reconnect", {}, timeout=5.0)
+        out = daemon_post("/reconnect", {}, timeout=5.0)
     except (urllib.error.URLError, OSError) as e:
         print(f"daemon: not reachable ({e})")
         return 1
@@ -156,7 +138,7 @@ def cmd_reconnect(_args: argparse.Namespace) -> int:
 
 def cmd_forget(_args: argparse.Namespace) -> int:
     try:
-        _post("/forget", {}, timeout=5.0)
+        daemon_post("/forget", {}, timeout=5.0)
     except (urllib.error.URLError, OSError) as e:
         print(f"daemon: not reachable ({e})")
         return 1
@@ -166,7 +148,7 @@ def cmd_forget(_args: argparse.Namespace) -> int:
 
 def cmd_connect(args: argparse.Namespace) -> int:
     try:
-        out = _post("/connect", {"address": args.address}, timeout=5.0)
+        out = daemon_post("/connect", {"address": args.address}, timeout=5.0)
     except urllib.error.HTTPError as e:
         print(f"connect rejected: {e.reason}")
         return 1

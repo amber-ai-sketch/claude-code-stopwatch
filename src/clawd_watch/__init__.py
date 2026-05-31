@@ -13,3 +13,12 @@ CONFIG_PATH = os.path.expanduser("~/.claude/clawd-watch-config.json")
 
 # BLE device advertising name prefix the daemon scans for.
 DEVICE_NAME_PREFIX = "ClawdWatch"
+
+# Timeout hierarchy (must stay in sync with settings.json hook timeout = 35s):
+#   HOOK_SETTINGS_TIMEOUT  = 35  — Claude Code's hook timeout in settings.json
+#   HOOK_REQUEST_TIMEOUT   = 32  — hook.py HTTP call to daemon (slightly under)
+#   DAEMON_APPROVAL_TIMEOUT = 30 — daemon waits for watch button (slightly under hook)
+HOOK_SETTINGS_TIMEOUT = 35.0
+HOOK_REQUEST_TIMEOUT = 32.0
+DAEMON_APPROVAL_TIMEOUT = 30.0
+HEARTBEAT_INTERVAL = 10.0

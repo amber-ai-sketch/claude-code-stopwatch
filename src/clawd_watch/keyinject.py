@@ -72,6 +72,16 @@ def _quartz():
     return _Quartz
 
 
+def _resolve_key(modifier: Optional[str], key: str) -> tuple[int, int | None, int] | None:
+    """Look up keycodes and modifier flags. Returns (keycode, mod_keycode, flags) or None."""
+    keycode = KEY_CODES.get(key)
+    if keycode is None:
+        return None
+    mod_keycode = MOD_KEYCODES.get(modifier) if modifier else None
+    flags = MOD_FLAGS.get(modifier, 0) if modifier else 0
+    return keycode, mod_keycode, flags
+
+
 def key_tap(modifier: Optional[str], key: str) -> bool:
     """Press + immediately release. Use for one-shot keys (Backspace,
     Esc, Return, Ctrl+C).
@@ -81,21 +91,17 @@ def key_tap(modifier: Optional[str], key: str) -> bool:
 
     Returns True on success, False if the key isn't known.
     """
-    keycode = KEY_CODES.get(key)
-    if keycode is None:
+    resolved = _resolve_key(modifier, key)
+    if resolved is None:
         log.warning("key_tap: unknown key %r", key)
         return False
-
-    mod_keycode = MOD_KEYCODES.get(modifier) if modifier else None
-    flags = MOD_FLAGS.get(modifier, 0) if modifier else 0
-
+    keycode, mod_keycode, flags = resolved
     if mod_keycode is not None:
         _post(mod_keycode, True, flags)
     _post(keycode, True, flags)
     _post(keycode, False, flags)
     if mod_keycode is not None:
         _post(mod_keycode, False, 0)
-
     log.info("key_tap %s+%s", modifier or "", key)
     return True
 
@@ -108,12 +114,11 @@ def key_down(modifier: Optional[str], key: str) -> bool:
     actual left-Shift key-down, so we must press the key itself, not just
     set a flag on the space event.
     """
-    keycode = KEY_CODES.get(key)
-    if keycode is None:
+    resolved = _resolve_key(modifier, key)
+    if resolved is None:
         log.warning("key_down: unknown key %r", key)
         return False
-    mod_keycode = MOD_KEYCODES.get(modifier) if modifier else None
-    flags = MOD_FLAGS.get(modifier, 0) if modifier else 0
+    keycode, mod_keycode, flags = resolved
     if mod_keycode is not None:
         _post(mod_keycode, True, flags)
     _post(keycode, True, flags)
@@ -124,12 +129,11 @@ def key_down(modifier: Optional[str], key: str) -> bool:
 def key_up(modifier: Optional[str], key: str) -> bool:
     """Release a key previously pressed via key_down — main key first,
     then the modifier key, mirroring key_down."""
-    keycode = KEY_CODES.get(key)
-    if keycode is None:
+    resolved = _resolve_key(modifier, key)
+    if resolved is None:
         log.warning("key_up: unknown key %r", key)
         return False
-    mod_keycode = MOD_KEYCODES.get(modifier) if modifier else None
-    flags = MOD_FLAGS.get(modifier, 0) if modifier else 0
+    keycode, mod_keycode, flags = resolved
     _post(keycode, False, flags)
     if mod_keycode is not None:
         _post(mod_keycode, False, 0)

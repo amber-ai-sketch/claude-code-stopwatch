@@ -27,7 +27,7 @@ import sys
 import threading
 
 from . import HTTP_HOST, HTTP_PORT
-from .statusline import _normalize, _post_to_daemon, _format_status_line
+from .statusline import normalize, post_to_daemon, format_status_line
 
 _SED_FILTER = "sed -E 's# / \\$[0-9.]+ block \\([^)]+\\)##; s# \\| 🔥 \\$[0-9.]+/hr##'"
 
@@ -75,7 +75,7 @@ def _parse_and_patch(raw: bytes) -> tuple[dict, bytes]:
         return {}, raw
     if not isinstance(payload, dict):
         return {}, raw
-    norm = _normalize(payload)
+    norm = normalize(payload)
     patched = json.dumps(_patch_for_ccusage(payload)).encode()
     return norm, patched
 
@@ -87,7 +87,7 @@ def main() -> int:
     # Fire-and-forget BLE POST.
     def _post():
         if norm:
-            _post_to_daemon(norm)
+            post_to_daemon(norm)
     bg = threading.Thread(target=_post, daemon=True)
     bg.start()
 
@@ -111,7 +111,7 @@ def main() -> int:
     if output and output.strip():
         sys.stdout.buffer.write(output)
     else:
-        sys.stdout.write(_format_status_line(norm))
+        sys.stdout.write(format_status_line(norm))
         sys.stdout.write("\n")
 
     # Briefly join the background thread so the process doesn't exit
