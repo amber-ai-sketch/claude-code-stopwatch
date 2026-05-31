@@ -22,3 +22,12 @@
   - 466px 圆屏放不下长句，需截断或滚动显示。
 - **Depends on**: 模式一（已就绪）。
 - **Start**: daemon `_handle_button` 的 right `up`（trigger 模式）分支里，注入 Shift+Space 停录后，延迟一小会儿等微信上屏完成，再走 Cmd+A/Cmd+C 读剪贴板 → 经 NUS 发一条新命令（如 `{"cmd":"transcript","text":"..."}`）给手表 → 固件加显示逻辑。注意恢复剪贴板。
+
+## 手表在 Claude 等待用户输入时刷成"等待"态
+
+- **What**: Claude 用 AskUserQuestion 弹选项让用户选时，手表应刷成"等待你输入"态，而不是干等无反馈。
+- **Why（已查清根因）**: 手表的 attention/waiting 态当前**只由工具权限请求 `PreToolUse` hook 驱动**（daemon 的 `waiting = len(self.pending)`，pending 只在 `_on_pre_tool` 填充）。而 AskUserQuestion 弹选项**不触发任何已装 hook**，daemon 完全感知不到，所以手表不刷。这是架构盲区，非 bug。
+- **线索（已查官方文档）**: Claude Code 有 `Notification` hook，matcher 支持 `idle_prompt`（"waiting and needs attention"）/`permission_prompt` 等类型。理论上 `idle_prompt` 能让 daemon 感知"Claude 在等你"。当前 6 个 hook（PreToolUse/PostToolUse/Stop/SessionStart/SessionEnd/UserPromptSubmit）里**没装 Notification**。
+- **未验证（做之前先实测）**: AskUserQuestion 到底会不会触发 `idle_prompt`、什么时机触发（很可能要空闲超时几秒才发，不是弹出即发——若如此体验会延迟）。先装个只打日志的 Notification hook 实测信号是否存在、时机如何，再决定接不接手表。
+- **Depends on**: 实测确认 Notification/idle_prompt 行为。
+- **Start**: settings.json 加 `Notification` hook（matcher `idle_prompt`）→ 复用现有 `clawd-watch-hook` 加个事件类型 → daemon 加一类"waiting for input"状态（区别于 permission 的 attention）→ 经 heartbeat 下发 → 固件加显示。
