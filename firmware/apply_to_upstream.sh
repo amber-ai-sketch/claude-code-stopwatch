@@ -40,5 +40,11 @@ mkdir -p "$TARGET"
 echo "==> copying app_claude/ into $TARGET"
 cp -R "$ROOT/app_claude/." "$TARGET/"
 
+# 3. Touch CMakeLists so GLOB_RECURSE re-runs and picks up newly added source
+# files. Without this, adding a new .cpp under app_claude/ leaves it out of the
+# build (stale glob) and you get undefined-reference link errors.
+touch "$UPSTREAM/main/CMakeLists.txt"
+echo "==> touched main/CMakeLists.txt (refresh GLOB_RECURSE)"
+
 echo "✓ upstream patched."
 echo "Next: cd upstream && python3 fetch_repos.py && idf.py set-target esp32s3 && idf.py build"

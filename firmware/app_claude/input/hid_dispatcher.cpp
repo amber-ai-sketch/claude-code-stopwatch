@@ -32,25 +32,28 @@ static void send_cmd(const char* json)
 
 void HidDispatcher::tick(bool left_pressed, bool right_pressed, uint32_t now_ms)
 {
-    // ── Right button: hold-to-talk + short-click Esc ──
+    // ── Right button: long-press hold + short-click Esc ──
+    // The device is a dumb terminal: long-press reports a raw "btn right
+    // down/up" event and the Mac daemon decides what it means per current mode
+    // (trigger mode → inject WeChat Shift+Space; mic mode → start recording).
+    // No mode state lives here.
     if (right_pressed && !_right_was_pressed) {
         _right_press_start_ms = now_ms;
         _right_long_fired     = false;
     }
 
-    if (right_pressed && !_shift_space_held &&
+    if (right_pressed && !_right_long_held &&
         (now_ms - _right_press_start_ms >= kLongMs)) {
-        // Crossed long threshold — hold left Shift+Space for dictation.
-        send_cmd("{\"cmd\":\"key_down\",\"mod\":\"shift\",\"key\":\"space\"}");
-        _shift_space_held = true;
+        send_cmd("{\"cmd\":\"btn\",\"key\":\"right\",\"edge\":\"down\"}");
+        _right_long_held  = true;
         _right_long_fired = true;
     }
 
     if (!right_pressed && _right_was_pressed) {
         // Released.
-        if (_shift_space_held) {
-            send_cmd("{\"cmd\":\"key_up\",\"mod\":\"shift\",\"key\":\"space\"}");
-            _shift_space_held = false;
+        if (_right_long_held) {
+            send_cmd("{\"cmd\":\"btn\",\"key\":\"right\",\"edge\":\"up\"}");
+            _right_long_held = false;
         } else if (!_right_long_fired) {
             // Short click, never crossed long threshold → Esc.
             send_cmd("{\"cmd\":\"key_tap\",\"key\":\"esc\"}");

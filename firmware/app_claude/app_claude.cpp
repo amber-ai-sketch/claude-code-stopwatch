@@ -5,7 +5,7 @@
 #include "app_claude.h"
 #include "ble/ble_nus.h"
 #include "ble/protocol_parse.h"
-#include "ui/idle_page.h"
+#include "ui/watch_face.h"
 #include <driver/gpio.h>
 #include <hal/hal.h>
 #include <mooncake.h>
@@ -62,9 +62,9 @@ void AppClaude::onOpen()
 
     {
         LvglLockGuard lock;
-        _idle_page = std::make_unique<IdlePage>();
-        _idle_page->update("Claude", 0.00f, 0.0f, 0.0f, 0.0f);
-        _idle_page->show();
+        _face = std::make_unique<WatchFace>();
+        _face->apply(_state);
+        _face->show();
     }
 }
 
@@ -100,19 +100,9 @@ void AppClaude::onRunning()
     uint32_t now = GetHAL().millis();
     if (now - _last_ui_apply_ms > 200) {
         _last_ui_apply_ms = now;
-        if (_idle_page) {
+        if (_face) {
             LvglLockGuard lock;
-            // Show real values when present; otherwise keep zeros.
-            const std::string& model = _state.model_name.empty()
-                ? std::string(_state.connected ? "Claude" : "—")
-                : _state.model_name;
-            _idle_page->update(
-                model,
-                _state.cost_valid ? _state.cost_usd : 0.0f,
-                _state.context_valid ? _state.context_pct : 0.0f,
-                _state.rate_5h_valid ? _state.rate_5h_pct : 0.0f,
-                _state.rate_7d_valid ? _state.rate_7d_pct : 0.0f
-            );
+            _face->apply(_state);
         }
     }
 
@@ -133,6 +123,6 @@ void AppClaude::onClose()
     _key_manager.reset();
     {
         LvglLockGuard lock;
-        _idle_page.reset();
+        _face.reset();
     }
 }

@@ -12,6 +12,8 @@
 #include "nimble/ble.h"
 #include "nimble/nimble_port.h"
 #include "nimble/nimble_port_freertos.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
 #include "host/ble_hs.h"
 #include "host/ble_uuid.h"
 #include "host/util/util.h"
@@ -23,6 +25,13 @@
 #include <string.h>
 
 static const char* TAG = "ble_nus";
+
+// Audio-send backpressure retry: when the host queue is full, wait this long
+// for the radio to drain, up to this many attempts. 3ms ≈ one tenth of the
+// default connection interval; 64 attempts ≈ 190ms of patience before a stuck
+// link is declared dead — far longer than any transient queue-full burst.
+static constexpr int kAudioSendRetryMs    = 3;
+static constexpr int kAudioSendMaxRetries = 64;
 
 // ─── UUIDs (Nordic UART Service) ─────────────────────────────────────
 static const ble_uuid128_t NUS_SVC_UUID = BLE_UUID128_INIT(
@@ -37,10 +46,25 @@ static const ble_uuid128_t NUS_TX_UUID = BLE_UUID128_INIT(
     0x9e, 0xca, 0xdc, 0x24, 0x0e, 0xe5, 0xa9, 0xe0,
     0x93, 0xf3, 0xa3, 0xb5, 0x03, 0x00, 0x40, 0x6e);
 
+// ─── Audio UUIDs (dedicated service, NOT the NUS line channel) ───────
+// Same vendor prefix, service nibble 0xA0 so it reads as "audio". Kept on
+// its own primary service + characteristic so binary PCM never shares the
+// newline-delimited NUS channel and CoreBluetooth resolves it by UUID.
+static const ble_uuid128_t AUDIO_SVC_UUID = BLE_UUID128_INIT(
+    0x9e, 0xca, 0xdc, 0x24, 0x0e, 0xe5, 0xa9, 0xe0,
+    0x93, 0xf3, 0xa3, 0xb5, 0x00, 0xa0, 0x40, 0x6e);
+
+static const ble_uuid128_t AUDIO_TX_UUID = BLE_UUID128_INIT(
+    0x9e, 0xca, 0xdc, 0x24, 0x0e, 0xe5, 0xa9, 0xe0,
+    0x93, 0xf3, 0xa3, 0xb5, 0x03, 0xa0, 0x40, 0x6e);
+
 // ─── State ───────────────────────────────────────────────────────────
 static uint16_t s_conn_handle = 0xffff;     // 0xffff = no connection
 static uint16_t s_tx_attr_handle = 0;
 static bool     s_tx_subscribed = false;
+static uint16_t s_audio_tx_attr_handle = 0;
+static bool     s_audio_subscribed = false;
+static uint16_t s_mtu = 0;                  // negotiated ATT MTU, 0 = none
 static uint32_t s_current_passkey = 0;
 
 static ble_nus_rx_line_cb s_rx_cb = nullptr;
@@ -75,6 +99,8 @@ static int gatt_rx_access(uint16_t conn_handle, uint16_t attr_handle,
                           struct ble_gatt_access_ctxt* ctxt, void* arg);
 static int gatt_tx_access(uint16_t conn_handle, uint16_t attr_handle,
                           struct ble_gatt_access_ctxt* ctxt, void* arg);
+static int gatt_audio_tx_access(uint16_t conn_handle, uint16_t attr_handle,
+                                struct ble_gatt_access_ctxt* ctxt, void* arg);
 
 // NimBLE struct ble_gatt_chr_def field order:
 //   uuid, access_cb, arg, descriptors, flags, min_key_size, val_handle, cpfd
@@ -106,6 +132,23 @@ static const struct ble_gatt_chr_def s_chr_defs[] = {
     },
 };
 
+// Audio service: single notify characteristic carrying binary PCM frames.
+static const struct ble_gatt_chr_def s_audio_chr_defs[] = {
+    {
+        /* uuid          */ &AUDIO_TX_UUID.u,
+        /* access_cb     */ gatt_audio_tx_access,
+        /* arg           */ nullptr,
+        /* descriptors   */ nullptr,
+        /* flags         */ BLE_GATT_CHR_F_NOTIFY | BLE_GATT_CHR_F_READ,
+        /* min_key_size  */ 0,
+        /* val_handle    */ &s_audio_tx_attr_handle,
+        /* cpfd          */ nullptr,
+    },
+    {  // terminator
+        nullptr, nullptr, nullptr, nullptr, 0, 0, nullptr, nullptr,
+    },
+};
+
 // NimBLE struct ble_gatt_svc_def field order:
 //   type, uuid, includes, characteristics
 static const struct ble_gatt_svc_def s_svc_defs[] = {
@@ -114,6 +157,12 @@ static const struct ble_gatt_svc_def s_svc_defs[] = {
         /* uuid            */ &NUS_SVC_UUID.u,
         /* includes        */ nullptr,
         /* characteristics */ s_chr_defs,
+    },
+    {
+        /* type            */ BLE_GATT_SVC_TYPE_PRIMARY,
+        /* uuid            */ &AUDIO_SVC_UUID.u,
+        /* includes        */ nullptr,
+        /* characteristics */ s_audio_chr_defs,
     },
     {  // terminator (type==0)
         0, nullptr, nullptr, nullptr,
@@ -139,6 +188,16 @@ static int gatt_tx_access(uint16_t conn_handle, uint16_t attr_handle,
                           struct ble_gatt_access_ctxt* ctxt, void* /*arg*/)
 {
     // TX is notify-only from our side; reads return empty.
+    if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
+        return 0;
+    }
+    return BLE_ATT_ERR_UNLIKELY;
+}
+
+static int gatt_audio_tx_access(uint16_t /*conn_handle*/, uint16_t /*attr_handle*/,
+                                struct ble_gatt_access_ctxt* ctxt, void* /*arg*/)
+{
+    // Audio TX is notify-only; reads return empty.
     if (ctxt->op == BLE_GATT_ACCESS_OP_READ_CHR) {
         return 0;
     }
@@ -240,6 +299,8 @@ static int gap_event_handler(struct ble_gap_event* event, void* /*arg*/)
         s_conn_handle = 0xffff;
         ble_hid_set_conn(0xffff);
         s_tx_subscribed = false;
+        s_audio_subscribed = false;
+        s_mtu = 0;
         s_current_passkey = 0;
         s_rx_len = 0;
         start_advertising();
@@ -249,6 +310,9 @@ static int gap_event_handler(struct ble_gap_event* event, void* /*arg*/)
         if (event->subscribe.attr_handle == s_tx_attr_handle) {
             s_tx_subscribed = event->subscribe.cur_notify;
             ESP_LOGI(TAG, "TX subscribed=%d", (int)s_tx_subscribed);
+        } else if (event->subscribe.attr_handle == s_audio_tx_attr_handle) {
+            s_audio_subscribed = event->subscribe.cur_notify;
+            ESP_LOGI(TAG, "AUDIO TX subscribed=%d", (int)s_audio_subscribed);
         } else {
             // Forward HID Input Report subscriptions.
             ble_hid_on_subscribe(event->subscribe.attr_handle,
@@ -257,6 +321,7 @@ static int gap_event_handler(struct ble_gap_event* event, void* /*arg*/)
         break;
 
     case BLE_GAP_EVENT_MTU:
+        s_mtu = event->mtu.value;
         ESP_LOGI(TAG, "MTU updated; conn=%d mtu=%d",
                  event->mtu.conn_handle, event->mtu.value);
         break;
@@ -366,6 +431,45 @@ int ble_nus_send(const char* json, size_t len)
     struct os_mbuf* om = ble_hs_mbuf_from_flat(tmp, len);
     if (!om) return -3;
     return ble_gatts_notify_custom(s_conn_handle, s_tx_attr_handle, om);
+}
+
+int ble_audio_send(const uint8_t* data, size_t len)
+{
+    if (s_conn_handle == 0xffff || !s_audio_subscribed) return -1;
+
+    // We push frames faster than the radio drains them each connection
+    // interval, so the host send queue fills up: ble_hs_mbuf_from_flat returns
+    // NULL (msys pool empty) or notify_custom returns BLE_HS_ENOMEM. That's
+    // normal backpressure, not a link error — yield a few ms to let the radio
+    // empty the queue, then retry the same frame. Only give up after a generous
+    // bound (≈ many connection intervals) so a genuinely dead link still fails.
+    for (int attempt = 0; attempt < kAudioSendMaxRetries; attempt++) {
+        struct os_mbuf* om = ble_hs_mbuf_from_flat(data, len);
+        if (!om) {
+            vTaskDelay(pdMS_TO_TICKS(kAudioSendRetryMs));
+            continue;
+        }
+        // notify_custom consumes om on every return path, so each retry must
+        // allocate a fresh mbuf above.
+        int rc = ble_gatts_notify_custom(s_conn_handle, s_audio_tx_attr_handle, om);
+        if (rc == BLE_HS_ENOMEM) {
+            vTaskDelay(pdMS_TO_TICKS(kAudioSendRetryMs));
+            continue;
+        }
+        return rc;  // 0 = sent; any other rc = real error, surfaced to caller
+    }
+    return BLE_HS_ENOMEM;  // queue never drained — caller ends the stream
+}
+
+bool ble_audio_is_subscribed(void)
+{
+    return s_conn_handle != 0xffff && s_audio_subscribed;
+}
+
+uint16_t ble_nus_current_mtu(void)
+{
+    if (s_conn_handle == 0xffff) return 0;
+    return s_mtu ? s_mtu : ble_att_mtu(s_conn_handle);
 }
 
 void ble_nus_start_adv(void)

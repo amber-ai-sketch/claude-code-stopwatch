@@ -2,7 +2,7 @@ diff --git a/sdkconfig.defaults b/sdkconfig.defaults
 index 693e09a..cfa6691 100644
 --- a/sdkconfig.defaults
 +++ b/sdkconfig.defaults
-@@ -30,3 +30,31 @@ CONFIG_LV_USE_TJPGD=y
+@@ -30,3 +30,34 @@ CONFIG_LV_USE_TJPGD=y
  CONFIG_LV_USE_DEMO_BENCHMARK=y
  CONFIG_LV_USE_DEMO_STRESS=y
  CONFIG_LV_USE_DEMO_SMARTWATCH=y
@@ -34,3 +34,6 @@ index 693e09a..cfa6691 100644
 +
 +# Pixel pet GIF on the idle page (bufo from claude-desktop-buddy).
 +CONFIG_LV_USE_GIF=y
++
++# Larger font tier for the 466 screen — session hero "%" and overview count.
++CONFIG_LV_FONT_MONTSERRAT_44=y

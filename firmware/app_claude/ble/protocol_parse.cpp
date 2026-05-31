@@ -80,6 +80,30 @@ bool apply_json_line(const char* line, WatchState& state, uint32_t now_ms)
     if (tool_v.is<const char*>()) state.current_tool = tool_v.as<const char*>();
     else if (doc.containsKey("tool")) state.current_tool.clear();
 
+    // ─── per-session detail array ──────────────────────────────
+    JsonArrayConst sessions = doc["sessions"];
+    if (!sessions.isNull()) {
+        state.session_details.clear();
+        for (JsonObjectConst so : sessions) {
+            SessionInfo info;
+            info.sid     = sv(so["sid"]);
+            info.running = (so["run"] | 0) != 0;
+            info.waiting = (so["wait"] | 0) != 0;
+            JsonVariantConst c = so["ctx"];
+            if (c.is<float>() || c.is<int>()) { info.context_pct = c.as<float>(); info.context_valid = true; }
+            JsonVariantConst m = so["cost"];
+            if (m.is<float>() || m.is<int>()) { info.cost_usd = m.as<float>(); info.cost_valid = true; }
+            info.model   = sv(so["model"]);
+            info.tool    = sv(so["tool"]);
+            info.project = sv(so["proj"]);
+            if (so["tin"].is<int>())  info.input_tokens        = so["tin"].as<int>();
+            if (so["tout"].is<int>()) info.output_tokens       = so["tout"].as<int>();
+            if (so["cr"].is<int>())   info.cache_read_tokens   = so["cr"].as<int>();
+            if (so["cw"].is<int>())   info.cache_create_tokens = so["cw"].as<int>();
+            state.session_details.push_back(info);
+        }
+    }
+
     // ─── prompt (pending approval) ─────────────────────────────
     JsonObjectConst pr = doc["prompt"];
     if (!pr.isNull()) {
