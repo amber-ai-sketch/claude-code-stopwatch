@@ -34,7 +34,8 @@ def _post(event: str, payload: dict) -> dict:
         return {}
     try:
         return json.loads(raw)
-    except Exception:
+    except Exception as e:
+        print(f"clawd-watch-hook: bad JSON from daemon ({len(raw)} bytes): {e}", file=sys.stderr)
         return {}
 
 

@@ -18,7 +18,7 @@ UI_LABEL="com.claude-code.clawd-watch-ui"
 UI_PLIST_SRC="$ROOT/resources/${UI_LABEL}.plist"
 UI_PLIST_DST="$LAUNCH_AGENTS/${UI_LABEL}.plist"
 LOG_PATH="$HOME/.claude/clawd-watch.log"
-PYPI_MIRROR="${PYPI_MIRROR:-https://pypi.tuna.tsinghua.edu.cn/simple}"
+PYPI_MIRROR="${PYPI_MIRROR:-https://pypi.org/simple}"
 
 say() { printf "\033[1;36m==>\033[0m %s\n" "$*"; }
 

@@ -59,13 +59,16 @@ static const ble_uuid128_t AUDIO_TX_UUID = BLE_UUID128_INIT(
     0x93, 0xf3, 0xa3, 0xb5, 0x03, 0xa0, 0x40, 0x6e);
 
 // ─── State ───────────────────────────────────────────────────────────
-static uint16_t s_conn_handle = 0xffff;     // 0xffff = no connection
+// These are written from NimBLE host task (gap/chr callbacks) and read
+// from the main loop. volatile prevents the compiler from caching stale
+// values in registers across task boundaries.
+static volatile uint16_t s_conn_handle = 0xffff;     // 0xffff = no connection
 static uint16_t s_tx_attr_handle = 0;
-static bool     s_tx_subscribed = false;
+static volatile bool     s_tx_subscribed = false;
 static uint16_t s_audio_tx_attr_handle = 0;
 static bool     s_audio_subscribed = false;
-static uint16_t s_mtu = 0;                  // negotiated ATT MTU, 0 = none
-static uint32_t s_current_passkey = 0;
+static volatile uint16_t s_mtu = 0;                  // negotiated ATT MTU, 0 = none
+static volatile uint32_t s_current_passkey = 0;
 
 static ble_nus_rx_line_cb s_rx_cb = nullptr;
 static void*              s_rx_user = nullptr;
@@ -91,6 +94,9 @@ static void rx_feed(const uint8_t* data, size_t n)
             }
         } else if (s_rx_len < sizeof(s_rx_buf) - 1) {
             s_rx_buf[s_rx_len++] = c;
+        } else {
+            ESP_LOGW(TAG, "rx buffer overflow (%u bytes), dropping incomplete line", (unsigned)s_rx_len);
+            s_rx_len = 0;
         }
     }
 }
@@ -423,7 +429,7 @@ int ble_nus_send(const char* json, size_t len)
     if (s_conn_handle == 0xffff || !s_tx_subscribed) return -1;
 
     // Append newline if caller didn't.
-    static char tmp[512];
+    char tmp[512];
     if (len + 2 > sizeof(tmp)) return -2;
     memcpy(tmp, json, len);
     if (len == 0 || tmp[len - 1] != '\n') {

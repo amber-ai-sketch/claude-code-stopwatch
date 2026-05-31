@@ -104,9 +104,9 @@ def main() -> int:
         )
         output = proc.stdout
     except subprocess.TimeoutExpired:
-        pass
-    except Exception:
-        pass
+        print("clawd-statusline: ccusage timed out after 5s", file=sys.stderr)
+    except Exception as e:
+        print(f"clawd-statusline: ccusage failed: {e}", file=sys.stderr)
 
     if output and output.strip():
         sys.stdout.buffer.write(output)
