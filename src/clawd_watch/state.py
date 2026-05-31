@@ -18,6 +18,16 @@ class Session:
     session_id: str
     running: bool = False
     last_seen: float = field(default_factory=time.time)
+    # Per-session statusline metrics, set by the statusline hook keyed on sid.
+    cost_usd: Optional[float] = None
+    context_pct: Optional[float] = None
+    model_name: Optional[str] = None
+    current_tool: Optional[str] = None
+    project: Optional[str] = None          # workspace dir basename, used as title
+    input_tokens: Optional[int] = None
+    output_tokens: Optional[int] = None
+    cache_read_tokens: Optional[int] = None
+    cache_create_tokens: Optional[int] = None
 
 
 @dataclass
@@ -34,6 +44,11 @@ class PendingApproval:
 # never fires (CLI killed mid-turn) we still want the device to drop out
 # of busy.* eventually.
 TOOL_TTL_SECONDS = 60.0
+
+# Cap how many sessions we describe in a heartbeat. The watch shows one
+# detail page per session; beyond a handful it's neither swipeable nor
+# MTU-friendly. Extra sessions still count in the total/running tallies.
+MAX_DEVICE_SESSIONS = 8
 
 
 class State:
@@ -134,9 +149,34 @@ class State:
 
     def update_statusline(self, payload: dict) -> None:
         self.statusline = payload
+        # Route metrics to the owning session so the device's per-session
+        # detail pages can show each session's own cost / context / model.
+        sid = payload.get("session_id")
+        if sid:
+            s = self.session_seen(sid)
+            if payload.get("cost_usd") is not None:
+                s.cost_usd = payload["cost_usd"]
+            if payload.get("context_pct") is not None:
+                s.context_pct = payload["context_pct"]
+            if payload.get("model_name") is not None:
+                s.model_name = payload["model_name"]
+            if payload.get("project") is not None:
+                s.project = payload["project"]
+            if payload.get("input_tokens") is not None:
+                s.input_tokens = payload["input_tokens"]
+            if payload.get("output_tokens") is not None:
+                s.output_tokens = payload["output_tokens"]
+            if payload.get("cache_read_tokens") is not None:
+                s.cache_read_tokens = payload["cache_read_tokens"]
+            if payload.get("cache_create_tokens") is not None:
+                s.cache_create_tokens = payload["cache_create_tokens"]
         self.changed.set()
 
-    def set_current_tool(self, tool: Optional[str]) -> None:
+    def set_current_tool(self, tool: Optional[str], sid: Optional[str] = None) -> None:
+        if sid:
+            s = self.sessions.get(sid)
+            if s:
+                s.current_tool = tool
         if self.current_tool != tool:
             self.current_tool = tool
             self._tool_set_at = time.time()
@@ -149,6 +189,42 @@ class State:
         running = sum(1 for s in self.sessions.values() if s.running)
         waiting = len(self.pending)
         p = self.first_pending()
+
+        # Which sessions have a pending approval — drives the per-session
+        # "waiting" state (Clawd raises a claw on that detail page).
+        waiting_sids = {pa.session_id for pa in self.pending.values()}
+
+        # Per-session detail for the device's swipeable pages. Compact keys
+        # and dropped-when-empty fields keep the BLE payload small. Capped at
+        # MAX_DEVICE_SESSIONS — the watch can't usefully page beyond that and
+        # an unbounded array would blow past a sane heartbeat size. Stable
+        # order = creation order so pages don't reshuffle under the user.
+        session_details = []
+        for s in list(self.sessions.values())[:MAX_DEVICE_SESSIONS]:
+            d: dict = {
+                "sid": s.session_id[:8],
+                "run": 1 if s.running else 0,
+                "wait": 1 if s.session_id in waiting_sids else 0,
+            }
+            if s.context_pct is not None:
+                d["ctx"] = round(s.context_pct, 1)
+            if s.cost_usd is not None:
+                d["cost"] = round(s.cost_usd, 2)
+            if s.model_name:
+                d["model"] = s.model_name
+            if s.current_tool:
+                d["tool"] = s.current_tool
+            if s.project:
+                d["proj"] = s.project
+            if s.input_tokens is not None:
+                d["tin"] = s.input_tokens
+            if s.output_tokens is not None:
+                d["tout"] = s.output_tokens
+            if s.cache_read_tokens is not None:
+                d["cr"] = s.cache_read_tokens
+            if s.cache_create_tokens is not None:
+                d["cw"] = s.cache_create_tokens
+            session_details.append(d)
 
         if p:
             msg = f"approve: {p.tool}"
@@ -179,4 +255,5 @@ class State:
             "rate_7d_pct": self.statusline.get("rate_7d_pct"),
             "model_name": self.statusline.get("model_name"),
             "current_tool": self.current_tool,
+            "sessions": session_details,
         }

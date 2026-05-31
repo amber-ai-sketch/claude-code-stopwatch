@@ -42,7 +42,7 @@ def cmd_status(_args: argparse.Namespace) -> int:
 
     conn = "✓ connected" if info["connected"] else "✗ disconnected"
     print(f"daemon:  uptime {info['uptime_s']}s")
-    print(f"ble:     {conn}  device={info.get('device_name')}")
+    print(f"ble:     {conn}  device={info.get('device_name')}  address={info.get('address')}")
     print(f"stats:   approvals={info['approvals_total']} denials={info['denials_total']}")
 
     sl = info.get("statusline") or {}
@@ -56,6 +56,15 @@ def cmd_status(_args: argparse.Namespace) -> int:
         print(f"line:    {' '.join(bits) if bits else '(empty)'}")
     if info.get("current_tool"):
         print(f"tool:    {info['current_tool']}")
+    voice = info.get("voice") or {}
+    if voice:
+        print(f"voice:   {voice.get('state', 'unknown')}")
+        last_test = voice.get("last_test") or {}
+        if last_test:
+            print(
+                f"         last_test ok={last_test.get('ok')} "
+                f"device={last_test.get('device_index')} rc={last_test.get('returncode')}"
+            )
 
     sessions = info["sessions"]
     print(f"sessions ({len(sessions)}):")
@@ -96,6 +105,75 @@ def cmd_test_statusline(_args: argparse.Namespace) -> int:
         return 1
     print(f"posted: {fake}")
     print(f"reply:  {out}")
+    return 0
+
+
+def cmd_voice_test(args: argparse.Namespace) -> int:
+    payload = {"text": args.text} if args.text else {}
+    if args.device_index is not None:
+        payload["device_index"] = args.device_index
+    try:
+        out = _post("/voice-test", payload, timeout=45.0)
+    except urllib.error.HTTPError as e:
+        print(f"voice-test rejected: {e.reason}")
+        return 1
+    except (urllib.error.URLError, OSError) as e:
+        print(f"daemon: not reachable ({e})")
+        return 1
+    state = "ok" if out.get("ok") else "failed"
+    print(f"voice-test: {state} device={out.get('device_index')} rc={out.get('returncode')}")
+    if out.get("stderr"):
+        print(out["stderr"])
+    return 0 if out.get("ok") else 1
+
+
+def cmd_scan(_args: argparse.Namespace) -> int:
+    try:
+        out = _get("/scan", timeout=12.0)
+    except (urllib.error.URLError, OSError) as e:
+        print(f"daemon: not reachable ({e})")
+        return 1
+    devices = out.get("devices", [])
+    if not devices:
+        print("no devices found (is the watch awake? is Bluetooth permission granted?)")
+        return 0
+    print(f"found {len(devices)} device(s):")
+    for d in devices:
+        rssi = f"{d['rssi']}dBm" if d.get("rssi") is not None else "?"
+        print(f"  {rssi:>7}  {d['address']}  {d['name'] or '(unnamed)'}")
+    return 0
+
+
+def cmd_reconnect(_args: argparse.Namespace) -> int:
+    try:
+        out = _post("/reconnect", {}, timeout=5.0)
+    except (urllib.error.URLError, OSError) as e:
+        print(f"daemon: not reachable ({e})")
+        return 1
+    print(f"reconnecting to {out.get('address') or '(scan)'}")
+    return 0
+
+
+def cmd_forget(_args: argparse.Namespace) -> int:
+    try:
+        _post("/forget", {}, timeout=5.0)
+    except (urllib.error.URLError, OSError) as e:
+        print(f"daemon: not reachable ({e})")
+        return 1
+    print("forgot device; daemon will scan by name")
+    return 0
+
+
+def cmd_connect(args: argparse.Namespace) -> int:
+    try:
+        out = _post("/connect", {"address": args.address}, timeout=5.0)
+    except urllib.error.HTTPError as e:
+        print(f"connect rejected: {e.reason}")
+        return 1
+    except (urllib.error.URLError, OSError) as e:
+        print(f"daemon: not reachable ({e})")
+        return 1
+    print(f"connecting to {out.get('address')}")
     return 0
 
 
@@ -288,6 +366,22 @@ def main() -> int:
     sub.add_parser("test-statusline", help="push a fake statusline payload (no Claude Code needed)").set_defaults(
         func=cmd_test_statusline
     )
+    voice = sub.add_parser("voice-test", help="play spoken test audio into BlackHole")
+    voice.add_argument("--text", help="text to synthesize and play")
+    voice.add_argument("--device-index", type=int, help="ffmpeg AudioToolbox output index")
+    voice.set_defaults(func=cmd_voice_test)
+    sub.add_parser("scan", help="scan for nearby BLE devices").set_defaults(
+        func=cmd_scan
+    )
+    sub.add_parser("reconnect", help="force an immediate BLE reconnect").set_defaults(
+        func=cmd_reconnect
+    )
+    sub.add_parser("forget", help="forget the saved device; scan by name again").set_defaults(
+        func=cmd_forget
+    )
+    conn = sub.add_parser("connect", help="connect to a specific BLE address and remember it")
+    conn.add_argument("address")
+    conn.set_defaults(func=cmd_connect)
     sub.add_parser("tail", help="tail -f the daemon log").set_defaults(func=cmd_tail)
     sub.add_parser("restart", help="restart the launchd service").set_defaults(
         func=cmd_restart

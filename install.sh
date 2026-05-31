@@ -14,6 +14,9 @@ LAUNCH_AGENTS="$HOME/Library/LaunchAgents"
 LABEL="com.claude-code.clawd-watch"
 PLIST_SRC="$ROOT/resources/${LABEL}.plist"
 PLIST_DST="$LAUNCH_AGENTS/${LABEL}.plist"
+UI_LABEL="com.claude-code.clawd-watch-ui"
+UI_PLIST_SRC="$ROOT/resources/${UI_LABEL}.plist"
+UI_PLIST_DST="$LAUNCH_AGENTS/${UI_LABEL}.plist"
 LOG_PATH="$HOME/.claude/clawd-watch.log"
 PYPI_MIRROR="${PYPI_MIRROR:-https://pypi.tuna.tsinghua.edu.cn/simple}"
 
@@ -31,7 +34,7 @@ say "Installing clawd-watch (editable) from $PYPI_MIRROR"
 
 # 2. link CLI entrypoints ---------------------------------------------------
 mkdir -p "$LOCAL_BIN"
-for bin in clawd-watch-daemon clawd-watch-hook clawd-watch clawd-statusline; do
+for bin in clawd-watch-daemon clawd-watch-hook clawd-watch clawd-watch-ui clawd-statusline; do
   src="$VENV/bin/$bin"
   dst="$LOCAL_BIN/$bin"
   if [[ ! -x "$src" ]]; then
@@ -61,6 +64,20 @@ fi
 say "Loading $LABEL into launchd"
 launchctl bootstrap "gui/$UID" "$PLIST_DST"
 launchctl enable "gui/$UID/$LABEL" || true
+
+# 3b. menu-bar UI agent -----------------------------------------------------
+sed -e "s|__PROJECT_ROOT__|$ROOT|g" \
+    -e "s|__LOG_PATH__|$LOG_PATH|g" \
+    "$UI_PLIST_SRC" > "$UI_PLIST_DST"
+
+if launchctl print "gui/$UID/$UI_LABEL" >/dev/null 2>&1; then
+  say "Unloading previous $UI_LABEL"
+  launchctl bootout "gui/$UID/$UI_LABEL" || true
+fi
+
+say "Loading $UI_LABEL into launchd (menu-bar icon)"
+launchctl bootstrap "gui/$UID" "$UI_PLIST_DST"
+launchctl enable "gui/$UID/$UI_LABEL" || true
 
 # 4. patch ~/.claude/settings.json ------------------------------------------
 SETTINGS="$HOME/.claude/settings.json"

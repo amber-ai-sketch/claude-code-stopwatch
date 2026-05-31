@@ -12,12 +12,21 @@ dependencies = [
   "aiohttp>=3.9",
   # Plan B: macOS keyboard injection via Quartz Event Services.
   "pyobjc-framework-Quartz>=10.0; sys_platform == 'darwin'",
+  # Menu-bar UI for connection status + BLE control.
+  "rumps>=0.4; sys_platform == 'darwin'",
 ]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
 
 [project.scripts]
 clawd-watch-daemon    = "clawd_watch.daemon:main"
 clawd-watch-hook      = "clawd_watch.hook:main"
 clawd-watch           = "clawd_watch.cli:main"
+clawd-watch-ui        = "clawd_watch.menubar:main"
 clawd-statusline      = "clawd_watch.statusline:main"
 clawd-statusline-tee  = "clawd_watch.statusline_with_ccusage:main"
 

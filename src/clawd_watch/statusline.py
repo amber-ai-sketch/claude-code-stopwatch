@@ -10,17 +10,23 @@ Performance: the HTTP POST has a 0.3s timeout and any failure is silent.
 Daemon down must NOT degrade the CLI experience.
 
 Field mapping (Claude Code statusline JSON → daemon):
-  model.display_name                    → model_name
-  cost.total_cost_usd                   → cost_usd
-  context_window.used_percentage        → context_pct
-  rate_limits.five_hour.used_percentage → rate_5h_pct
-  rate_limits.seven_day.used_percentage → rate_7d_pct
+  model.display_name                                  → model_name
+  cost.total_cost_usd                                 → cost_usd
+  context_window.used_percentage                      → context_pct
+  context_window.current_usage.input_tokens           → input_tokens
+  context_window.current_usage.output_tokens          → output_tokens
+  context_window.current_usage.cache_read_input_tokens     → cache_read_tokens
+  context_window.current_usage.cache_creation_input_tokens → cache_create_tokens
+  workspace.current_dir (basename)                    → project
+  rate_limits.five_hour.used_percentage               → rate_5h_pct
+  rate_limits.seven_day.used_percentage               → rate_7d_pct
 
 Schema reference: https://code.claude.com/docs/en/statusline
 """
 from __future__ import annotations
 
 import json
+import os
 import sys
 import urllib.error
 import urllib.request
@@ -31,6 +37,10 @@ from . import HTTP_HOST, HTTP_PORT
 def _normalize(payload: dict) -> dict:
     """Pull keys we care about out of a Claude Code statusline JSON."""
     out: dict = {}
+
+    sid = payload.get("session_id")
+    if isinstance(sid, str) and sid:
+        out["session_id"] = sid
 
     model = payload.get("model")
     if isinstance(model, dict):
@@ -49,6 +59,24 @@ def _normalize(payload: dict) -> dict:
         pct = ctx.get("used_percentage")
         if isinstance(pct, (int, float)):
             out["context_pct"] = float(pct)
+
+        usage = ctx.get("current_usage")
+        if isinstance(usage, dict):
+            for src, dst in (
+                ("input_tokens", "input_tokens"),
+                ("output_tokens", "output_tokens"),
+                ("cache_read_input_tokens", "cache_read_tokens"),
+                ("cache_creation_input_tokens", "cache_create_tokens"),
+            ):
+                v = usage.get(src)
+                if isinstance(v, int):
+                    out[dst] = v
+
+    workspace = payload.get("workspace")
+    if isinstance(workspace, dict):
+        cwd = workspace.get("current_dir")
+        if isinstance(cwd, str) and cwd:
+            out["project"] = os.path.basename(cwd.rstrip("/"))
 
     rl = payload.get("rate_limits")
     if isinstance(rl, dict):
