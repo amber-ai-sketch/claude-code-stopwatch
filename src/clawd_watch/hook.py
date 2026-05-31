@@ -13,30 +13,13 @@ from __future__ import annotations
 import json
 import sys
 import urllib.error
-import urllib.request
 
-from . import HTTP_HOST, HTTP_PORT
-
-REQUEST_TIMEOUT = 32.0  # slightly under the hook's 35s timeout in settings.json
+from . import HOOK_REQUEST_TIMEOUT
+from .http_client import daemon_post
 
 
 def _post(event: str, payload: dict) -> dict:
-    data = json.dumps(payload).encode()
-    req = urllib.request.Request(
-        f"http://{HTTP_HOST}:{HTTP_PORT}/{event}",
-        data=data,
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=REQUEST_TIMEOUT) as resp:
-        raw = resp.read()
-    if not raw:
-        return {}
-    try:
-        return json.loads(raw)
-    except Exception as e:
-        print(f"clawd-watch-hook: bad JSON from daemon ({len(raw)} bytes): {e}", file=sys.stderr)
-        return {}
+    return daemon_post(f"/{event}", payload, timeout=HOOK_REQUEST_TIMEOUT)
 
 
 def _emit_pretool_decision(decision: str, reason: str) -> None:

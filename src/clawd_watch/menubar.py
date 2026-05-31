@@ -20,27 +20,11 @@ import urllib.request
 
 import rumps
 
-from . import HTTP_HOST, HTTP_PORT, LOG_PATH
+from . import LOG_PATH
+from .http_client import daemon_get, daemon_post
 
 PLIST_LABEL = "com.claude-code.clawd-watch"
 POLL_SECONDS = 3
-BASE_URL = f"http://{HTTP_HOST}:{HTTP_PORT}"
-
-
-def _get(path: str, timeout: float) -> dict:
-    with urllib.request.urlopen(f"{BASE_URL}{path}", timeout=timeout) as resp:
-        return json.loads(resp.read())
-
-
-def _post(path: str, payload: dict, timeout: float) -> dict:
-    req = urllib.request.Request(
-        f"{BASE_URL}{path}",
-        data=json.dumps(payload).encode(),
-        headers={"Content-Type": "application/json"},
-        method="POST",
-    )
-    with urllib.request.urlopen(req, timeout=timeout) as resp:
-        return json.loads(resp.read())
 
 
 class ClawdWatchMenuBar(rumps.App):
@@ -98,7 +82,7 @@ class ClawdWatchMenuBar(rumps.App):
             self._scan_result = None
 
         try:
-            status = _get("/status", timeout=2.0)
+            status = daemon_get("/status", timeout=2.0)
         except (urllib.error.URLError, OSError):
             self.title = "⚪ Clawd"
             self._link_row.title = "后台服务未运行"
@@ -146,7 +130,7 @@ class ClawdWatchMenuBar(rumps.App):
 
     def _set_mode(self, mode: str) -> None:
         try:
-            _post("/mode", {"mode": mode}, timeout=2.0)
+            daemon_post("/mode", {"mode": mode}, timeout=2.0)
         except (urllib.error.URLError, OSError) as e:
             rumps.alert("切换模式失败", str(e))
             return
@@ -163,7 +147,7 @@ class ClawdWatchMenuBar(rumps.App):
 
     def _scan_worker(self) -> None:
         try:
-            result = _get("/scan", timeout=12.0).get("devices", [])
+            result = daemon_get("/scan", timeout=12.0).get("devices", [])
         except (urllib.error.URLError, OSError) as e:
             result = []
             print(f"scan failed: {e}", file=sys.stderr)
@@ -177,7 +161,7 @@ class ClawdWatchMenuBar(rumps.App):
             return
         self._nearby.title = f"附近设备（{len(devices)}）"
         try:
-            saved = (_get("/status", timeout=2.0) or {}).get("address")
+            saved = (daemon_get("/status", timeout=2.0) or {}).get("address")
         except (urllib.error.URLError, OSError):
             saved = None
         for d in devices:
@@ -193,14 +177,14 @@ class ClawdWatchMenuBar(rumps.App):
         # The next poll tick repaints the title icon once the link comes up.
         def _connect(_sender) -> None:
             try:
-                _post("/connect", {"address": address}, timeout=5.0)
+                daemon_post("/connect", {"address": address}, timeout=5.0)
             except (urllib.error.URLError, OSError) as e:
                 print(f"connect failed: {e}", file=sys.stderr)
         return _connect
 
     def _on_reconnect(self, _sender) -> None:
         try:
-            _post("/reconnect", {}, timeout=5.0)
+            daemon_post("/reconnect", {}, timeout=5.0)
         except (urllib.error.URLError, OSError) as e:
             print(f"reconnect failed: {e}", file=sys.stderr)
 
@@ -208,7 +192,7 @@ class ClawdWatchMenuBar(rumps.App):
         if not rumps.alert("忘记此设备？", "下次将重新扫描配对。", ok="忘记", cancel="取消"):
             return
         try:
-            _post("/forget", {}, timeout=5.0)
+            daemon_post("/forget", {}, timeout=5.0)
             self._nearby.clear()
             self._nearby.title = "附近设备"
         except (urllib.error.URLError, OSError) as e:
