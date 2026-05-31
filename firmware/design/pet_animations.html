@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body {
+    margin:0; padding:48px 40px 70px;
+    background:#161616;
+    font-family:-apple-system,"SF Pro Display","Helvetica Neue",sans-serif;
+  }
+  h1 { color:#e8e8e8; font-weight:700; font-size:24px; text-align:center; margin:0 0 4px; }
+  .sub { color:#666; font-size:14px; text-align:center; margin:0 0 40px; }
+  .row { display:flex; flex-wrap:wrap; gap:48px; justify-content:center; align-items:flex-start; }
+  .stage { text-align:center; }
+  .cap { margin-top:18px; }
+  .cap b { font-size:16px; }
+  .cap p { color:#7a7a7a; font-size:13px; margin:6px 0 0; line-height:1.5; max-width:280px; }
+
+  .watch {
+    width:380px; height:380px; border-radius:50%;
+    background:radial-gradient(circle at 50% 42%, #0d0d0d 0%, #000 75%);
+    position:relative; overflow:hidden;
+    box-shadow:0 0 0 5px #2a2a2a, 0 14px 40px rgba(0,0,0,.6);
+  }
+  svg { position:absolute; inset:0; }
+  .lbl { position:absolute; left:0;right:0; text-align:center; color:#fff; }
+  .dim { color:#5e5e5e; }
+  .grey{ color:#8a8a8a; }
+  .hero{ font-weight:700; line-height:1; }
+  .chip { display:inline-block; padding:4px 15px; border-radius:18px; font-size:14px; font-weight:600; letter-spacing:.4px; }
+  .chip.run  { background:rgba(217,119,87,.18); color:#D97757; }
+  .chip.idle { background:rgba(120,120,120,.16); color:#9a9a9a; }
+  .chip.wait { background:rgba(255,180,60,.20);  color:#ffb43c; }
+
+  /* ── pet sunburst rays ── */
+  .ray { transform-origin:100px 100px; }
+
+  /* ① WORKING: spin steadily + gentle pulse, bright orange */
+  .pet-working .burst { animation:spin 6s linear infinite; transform-origin:100px 100px; }
+  .pet-working .core  { animation:pulse 1.6s ease-in-out infinite; transform-origin:100px 100px; }
+  @keyframes spin  { to { transform:rotate(360deg); } }
+  @keyframes pulse { 0%,100%{transform:scale(1);} 50%{transform:scale(1.06);} }
+
+  /* ② IDLE: slow breathe, dim, eyes closed, zzz drifts up */
+  .pet-idle .whole { animation:breathe 4s ease-in-out infinite; transform-origin:100px 100px; }
+  @keyframes breathe { 0%,100%{transform:scale(.96);opacity:.8;} 50%{transform:scale(1);opacity:1;} }
+  .zzz { animation:drift 3s ease-in-out infinite; opacity:0; }
+  .zzz.z2 { animation-delay:1s; } .zzz.z3 { animation-delay:2s; }
+  @keyframes drift { 0%{opacity:0; transform:translateY(0) scale(.6);} 30%{opacity:1;} 100%{opacity:0; transform:translateY(-26px) scale(1.1);} }
+
+  /* ③ WAITING: bounce + flash yellow, eyes wide, bang ! */
+  .pet-waiting .whole { animation:bounce 0.7s ease-in-out infinite; transform-origin:100px 130px; }
+  @keyframes bounce { 0%,100%{transform:translateY(0);} 50%{transform:translateY(-14px);} }
+  .pet-waiting .burst .ray { animation:flash 0.7s ease-in-out infinite; }
+  @keyframes flash { 0%,100%{opacity:.55;} 50%{opacity:1;} }
+  .bang { animation:bangpop 0.7s ease-in-out infinite; transform-origin:center; }
+  @keyframes bangpop { 0%,100%{transform:scale(.85);} 50%{transform:scale(1.15);} }
+
+  /* attention dashed ring for waiting */
+  .wait-ring { animation:rotring 3s linear infinite; transform-origin:190px 190px; }
+  @keyframes rotring { to { transform:rotate(360deg); } }
+</style>
+</head>
+<body>
+
+<h1>Claude 吉祥物 · 三态动画</h1>
+<p class="sub">以 Anthropic 星芒符号为吉祥物 · 矢量动画（可 1:1 落到 LVGL lv_anim，不占 flash）· 浏览器打开本文件看完整动效</p>
+
+<div class="row">
+
+  <!-- ① WORKING -->
+  <div class="stage">
+    <div class="watch pet-working">
+      <svg viewBox="0 0 380 380">
+        <!-- orange aura ring -->
+        <circle cx="190" cy="190" r="168" fill="none" stroke="#1a1410" stroke-width="8"/>
+        <circle cx="190" cy="190" r="168" fill="none" stroke="#D97757" stroke-width="8"
+                stroke-linecap="round" stroke-dasharray="800 1056" opacity=".85" transform="rotate(-90 190 190)"/>
+        <!-- pet group -->
+        <g transform="translate(90 60)">
+          <g class="core">
+            <g class="burst">
+              <!-- 10 sunburst rays, hand-drawn teardrop -->
+              <g fill="#D97757">
+                <path class="ray" d="M100 18 C108 50 108 60 100 86 C92 60 92 50 100 18Z"/>
+                <path class="ray" transform="rotate(36 100 100)"  d="M100 18 C108 50 108 60 100 86 C92 60 92 50 100 18Z"/>
+                <path class="ray" transform="rotate(72 100 100)"  d="M100 18 C108 50 108 60 100 86 C92 60 92 50 100 18Z"/>
+                <path class="ray" transform="rotate(108 100 100)" d="M100 18 C108 50 108 60 100 86 C92 60 92 50 100 18Z"/>
+                <path class="ray" transform="rotate(144 100 100)" d="M100 18 C108 50 108 60 100 86 C92 60 92 50 100 18Z"/>
+                <path class="ray" transform="rotate(180 100 100)" d="M100 18 C108 50 108 60 100 86 C92 60 92 50 100 18Z"/>
+                <path class="ray" transform="rotate(216 100 100)" d="M100 18 C108 50 108 60 100 86 C92 60 92 50 100 18Z"/>
+                <path class="ray" transform="rotate(252 100 100)" d="M100 18 C108 50 108 60 100 86 C92 60 92 50 100 18Z"/>
+                <path class="ray" transform="rotate(288 100 100)" d="M100 18 C108 50 108 60 100 86 C92 60 92 50 100 18Z"/>
+                <path class="ray" transform="rotate(324 100 100)" d="M100 18 C108 50 108 60 100 86 C92 60 92 50 100 18Z"/>
+              </g>
+            </g>
+            <!-- face: focused eyes -->
+            <circle cx="100" cy="100" r="40" fill="#0d0d0d"/>
+            <ellipse cx="86" cy="98" rx="6" ry="8" fill="#fff"/>
+            <ellipse cx="114" cy="98" rx="6" ry="8" fill="#fff"/>
+            <path d="M88 116 Q100 122 112 116" stroke="#fff" stroke-width="3" fill="none" stroke-linecap="round"/>
+          </g>
+        </g>
+      </svg>
+      <div class="lbl" style="top:48px;"><span class="chip run">working</span></div>
+      <div class="lbl hero" style="top:252px; font-size:46px;">2<span class="dim" style="font-size:28px;"> / 3</span></div>
+      <div class="lbl grey" style="top:304px; font-size:14px;">running</div>
+    </div>
+    <div class="cap"><b style="color:#D97757;">① 执行中</b>
+      <p>星芒持续旋转 + 核心脉动呼吸，专注的眼神。橙环点亮 —— 有任务在跑。</p></div>
+  </div>
+
+  <!-- ② IDLE -->
+  <div class="stage">
+    <div class="watch pet-idle">
+      <svg viewBox="0 0 380 380">
+        <circle cx="190" cy="190" r="168" fill="none" stroke="#161616" stroke-width="8"/>
+        <g transform="translate(90 60)">
+          <g class="whole">
+            <!-- dim grey rays, static -->
+            <g fill="#4a4a4a">
+              <path d="M100 28 C107 54 107 62 100 84 C93 62 93 54 100 28Z"/>
+              <path transform="rotate(36 100 100)"  d="M100 28 C107 54 107 62 100 84 C93 62 93 54 100 28Z"/>
+              <path transform="rotate(72 100 100)"  d="M100 28 C107 54 107 62 100 84 C93 62 93 54 100 28Z"/>
+              <path transform="rotate(108 100 100)" d="M100 28 C107 54 107 62 100 84 C93 62 93 54 100 28Z"/>
+              <path transform="rotate(144 100 100)" d="M100 28 C107 54 107 62 100 84 C93 62 93 54 100 28Z"/>
+              <path transform="rotate(180 100 100)" d="M100 28 C107 54 107 62 100 84 C93 62 93 54 100 28Z"/>
+              <path transform="rotate(216 100 100)" d="M100 28 C107 54 107 62 100 84 C93 62 93 54 100 28Z"/>
+              <path transform="rotate(252 100 100)" d="M100 28 C107 54 107 62 100 84 C93 62 93 54 100 28Z"/>
+              <path transform="rotate(288 100 100)" d="M100 28 C107 54 107 62 100 84 C93 62 93 54 100 28Z"/>
+              <path transform="rotate(324 100 100)" d="M100 28 C107 54 107 62 100 84 C93 62 93 54 100 28Z"/>
+            </g>
+            <circle cx="100" cy="100" r="38" fill="#0d0d0d"/>
+            <!-- closed sleepy eyes -->
+            <path d="M82 100 Q90 106 98 100" stroke="#8a8a8a" stroke-width="3" fill="none" stroke-linecap="round"/>
+            <path d="M102 100 Q110 106 118 100" stroke="#8a8a8a" stroke-width="3" fill="none" stroke-linecap="round"/>
+            <ellipse cx="100" cy="116" rx="5" ry="3" fill="#3a3a3a"/>
+          </g>
+          <!-- zzz -->
+          <text class="zzz"    x="138" y="60" fill="#6a6a6a" font-size="18" font-weight="700">z</text>
+          <text class="zzz z2" x="150" y="46" fill="#6a6a6a" font-size="22" font-weight="700">z</text>
+          <text class="zzz z3" x="164" y="30" fill="#6a6a6a" font-size="26" font-weight="700">z</text>
+        </g>
+      </svg>
+      <div class="lbl" style="top:48px;"><span class="chip idle">idle</span></div>
+      <div class="lbl hero" style="top:252px; font-size:46px; color:#888;">0<span class="dim" style="font-size:28px;"> / 0</span></div>
+      <div class="lbl grey" style="top:304px; font-size:14px;">no sessions</div>
+    </div>
+    <div class="cap"><b style="color:#9a9a9a;">② 空闲</b>
+      <p>星芒变灰、缓慢呼吸缩放，闭眼打盹，zzz 向上飘。无环 —— 一个任务都没在跑。</p></div>
+  </div>
+
+  <!-- ③ WAITING -->
+  <div class="stage">
+    <div class="watch pet-waiting">
+      <svg viewBox="0 0 380 380">
+        <circle cx="190" cy="190" r="168" fill="none" stroke="#1f1810" stroke-width="8"/>
+        <circle class="wait-ring" cx="190" cy="190" r="168" fill="none" stroke="#ffb43c" stroke-width="8"
+                stroke-linecap="round" stroke-dasharray="22 40" opacity=".9"/>
+        <g transform="translate(90 60)">
+          <g class="whole">
+            <!-- yellow flashing rays -->
+            <g fill="#ffb43c" class="burst">
+              <path class="ray" d="M100 16 C108 50 108 60 100 86 C92 60 92 50 100 16Z"/>
+              <path class="ray" transform="rotate(36 100 100)"  d="M100 16 C108 50 108 60 100 86 C92 60 92 50 100 16Z"/>
+              <path class="ray" transform="rotate(72 100 100)"  d="M100 16 C108 50 108 60 100 86 C92 60 92 50 100 16Z"/>
+              <path class="ray" transform="rotate(108 100 100)" d="M100 16 C108 50 108 60 100 86 C92 60 92 50 100 16Z"/>
+              <path class="ray" transform="rotate(144 100 100)" d="M100 16 C108 50 108 60 100 86 C92 60 92 50 100 16Z"/>
+              <path class="ray" transform="rotate(180 100 100)" d="M100 16 C108 50 108 60 100 86 C92 60 92 50 100 16Z"/>
+              <path class="ray" transform="rotate(216 100 100)" d="M100 16 C108 50 108 60 100 86 C92 60 92 50 100 16Z"/>
+              <path class="ray" transform="rotate(252 100 100)" d="M100 16 C108 50 108 60 100 86 C92 60 92 50 100 16Z"/>
+              <path class="ray" transform="rotate(288 100 100)" d="M100 16 C108 50 108 60 100 86 C92 60 92 50 100 16Z"/>
+              <path class="ray" transform="rotate(324 100 100)" d="M100 16 C108 50 108 60 100 86 C92 60 92 50 100 16Z"/>
+            </g>
+            <circle cx="100" cy="100" r="40" fill="#0d0d0d"/>
+            <!-- wide surprised eyes -->
+            <circle cx="86" cy="98" r="8" fill="#fff"/>
+            <circle cx="114" cy="98" r="8" fill="#fff"/>
+            <circle cx="86" cy="98" r="3.5" fill="#0d0d0d"/>
+            <circle cx="114" cy="98" r="3.5" fill="#0d0d0d"/>
+            <ellipse cx="100" cy="118" rx="7" ry="5" fill="#ffb43c"/>
+          </g>
+          <!-- bang ! -->
+          <g class="bang" transform="translate(150 36)">
+            <rect x="-4" y="-14" width="8" height="20" rx="4" fill="#ffb43c"/>
+            <circle cx="0" cy="13" r="4.5" fill="#ffb43c"/>
+          </g>
+        </g>
+      </svg>
+      <div class="lbl" style="top:48px;"><span class="chip wait">waiting</span></div>
+      <div class="lbl hero" style="top:248px; font-size:30px; color:#ffb43c; font-weight:700;">approve?</div>
+      <div class="lbl grey" style="top:296px; font-size:13px;">⚙ Bash · session 1</div>
+    </div>
+    <div class="cap"><b style="color:#ffb43c;">③ 等待确认</b>
+      <p>星芒变黄闪烁、整体上下弹跳，惊讶睁大眼 + 感叹号。黄色虚线环转动 —— 有任务待批准。</p></div>
+  </div>
+
+</div>
+
+</body>
+</html>

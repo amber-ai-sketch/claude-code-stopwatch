@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<title>Clawd Watch · 真机 1:1 对照 (466×466)</title>
+<style>
+  body{margin:0;padding:40px;background:#1b1b1b;
+    font-family:-apple-system,"SF Pro Display","Helvetica Neue",sans-serif;color:#ccc;}
+  h1{font-size:22px;font-weight:700;text-align:center;margin:0 0 4px;color:#eee;}
+  .note{text-align:center;color:#777;font-size:13px;margin:0 0 28px;max-width:780px;margin-inline:auto;line-height:1.6;}
+  .grid{display:flex;flex-wrap:wrap;gap:56px;justify-content:center;align-items:flex-start;}
+  .col{text-align:center;}
+  .coltitle{font-size:15px;font-weight:600;margin:0 0 16px;}
+  .coltitle.cur{color:#c97;} .coltitle.cal{color:#7c8;}
+  .pair{display:flex;flex-direction:column;gap:34px;}
+  .cap{color:#888;font-size:12px;margin-top:10px;max-width:466px;line-height:1.5;}
+  .cap b{color:#aaa;}
+
+  /* 真机 1:1 —— 屏 466×466，圆形 AMOLED */
+  .watch{width:466px;height:466px;border-radius:50%;background:#000;
+    position:relative;overflow:hidden;box-shadow:0 0 0 5px #2a2a2a,0 14px 40px rgba(0,0,0,.6);}
+  .watch *{box-sizing:border-box;}
+  .el{position:absolute;left:50%;transform:translateX(-50%);text-align:center;white-space:nowrap;line-height:1;}
+  .ring{position:absolute;inset:0;}
+  .chip{display:inline-block;border-radius:18px;font-weight:600;letter-spacing:.4px;}
+  .pager{position:absolute;left:0;right:0;display:flex;gap:7px;justify-content:center;align-items:center;}
+  .pdot{width:7px;height:7px;border-radius:50%;background:#3a3a3a;}
+  .pdot.cur{background:#D97757;width:16px;height:7px;border-radius:3px;}
+  .pet{position:absolute;} .pet i{position:absolute;display:block;}
+</style>
+</head>
+<body>
+
+<h1>Clawd Watch · 真机 1:1 对照（466 × 466）</h1>
+<p class="note">
+  浏览器里这个圆 = 真机屏幕原尺寸（466px）。<b style="color:#c97;">左列</b>是当前固件——字偏小、session 的 context 整圈环压住底部页码点。
+  <b style="color:#7c8;">右列</b>是重新设计：字号放大（只用固件已编入的 montserrat 档），<b>session 的 context 环改成底部留缺口的弧环</b>，pager 落在缺口里，物理上不再压环。
+</p>
+
+<div class="grid">
+  <div class="col">
+    <div class="coltitle cur">当前固件（有重叠）</div>
+    <div class="pair">
+      <div><div class="watch" id="ov-cur"></div><div class="cap"><b>总览页</b> · chip 18 / count 36 / sub 16</div></div>
+      <div><div class="watch" id="se-cur"></div><div class="cap"><b>session 页</b> · 整圈环⌀396，<b style="color:#c66;">pager 压在环底</b></div></div>
+    </div>
+  </div>
+  <div class="col">
+    <div class="coltitle cal">重新设计 v2</div>
+    <div class="pair">
+      <div><div class="watch" id="ov-cal"></div><div class="cap"><b>总览页</b> · chip 22 / count 44 / sub 20，整体放大</div></div>
+      <div><div class="watch" id="se-cal"></div><div class="cap"><b>session 页 v4</b> · 去掉 ctx 数字+页码 · 标题 + token 四宫格为主体 · 环示 context</div></div>
+    </div>
+  </div>
+</div>
+
+<script>
+const ORANGE="#D97757", GREY="#8a8a8a", DIM="#5e5e5e", DIMORANGE="#9c6b56", WHITE="#fff";
+
+// align: 'top'(顶边距顶 dy) | 'center'(中心距中心 dy) | 'bottom'(底边距底 dy)
+function el(parent, {align, dy=0, font, color=WHITE, text, chip, chipBg, ls}){
+  const d=document.createElement('div');
+  d.className='el'+(chip?' chip':'');
+  d.style.fontSize=font+'px';
+  d.style.color=color;
+  if(ls) d.style.letterSpacing=ls+'px';
+  if(chip){ d.style.background=chipBg; d.style.padding=(font<16?'5px 14px':'6px 16px'); }
+  if(align==='top'){ d.style.top=dy+'px'; }
+  else if(align==='bottom'){ d.style.bottom=dy+'px'; d.style.top='auto'; }
+  else { d.style.top='50%'; d.style.transform=`translate(-50%, calc(-50% + ${dy}px))`; }
+  d.innerHTML=text;
+  parent.appendChild(d);
+  return d;
+}
+
+// 像素吉祥物（静态 idle 态），root 192×118，居中在 (cx, cy)
+function pet(parent, cx, cy){
+  const W=192,H=118;
+  const p=document.createElement('div');
+  p.className='pet';
+  p.style.left=(cx-W/2)+'px'; p.style.top=(cy-H/2)+'px';
+  p.style.width=W+'px'; p.style.height=H+'px';
+  const rects=[
+    [0,22,22,22,DIMORANGE],[170,22,22,22,DIMORANGE],
+    [22,0,148,86,DIMORANGE],
+    [34,86,19,30,DIMORANGE],[67,86,19,30,DIMORANGE],[106,86,19,30,DIMORANGE],[139,86,19,30,DIMORANGE],
+    [50,34,22,6,'#0d0d0d'],[120,34,22,6,'#0d0d0d'],
+  ];
+  for(const [x,y,w,h,c] of rects){
+    const i=document.createElement('i');
+    i.style.left=x+'px'; i.style.top=y+'px'; i.style.width=w+'px'; i.style.height=h+'px'; i.style.background=c;
+    p.appendChild(i);
+  }
+  parent.appendChild(p);
+}
+
+// 整圈环（当前固件做法）
+function ringFull(parent, dia, stroke, pct, color){
+  const r=(dia-stroke)/2, c=233, circ=2*Math.PI*r, fill=circ*pct/100;
+  parent.insertAdjacentHTML('beforeend',
+    `<svg class="ring" viewBox="0 0 466 466">
+       <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="#1b1b1b" stroke-width="${stroke}"/>
+       <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}"
+               stroke-linecap="round" stroke-dasharray="${fill} ${circ-fill}" transform="rotate(-90 ${c} ${c})"/>
+     </svg>`);
+}
+
+// 底部留缺口的弧环（重新设计）—— 缺口居中在正下方，宽 gapDeg
+function ringArc(parent, dia, stroke, pct, color, gapDeg){
+  const r=(dia-stroke)/2, c=233, circ=2*Math.PI*r;
+  const trackLen=circ*(360-gapDeg)/360;
+  const rot=90+gapDeg/2;  // 让缺口居中在底部
+  parent.insertAdjacentHTML('beforeend',
+    `<svg class="ring" viewBox="0 0 466 466">
+       <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="#1f1814" stroke-width="${stroke}"
+               stroke-linecap="round" stroke-dasharray="${trackLen} ${circ}" transform="rotate(${rot} ${c} ${c})"/>
+       <circle cx="${c}" cy="${c}" r="${r}" fill="none" stroke="${color}" stroke-width="${stroke}"
+               stroke-linecap="round" stroke-dasharray="${trackLen*pct/100} ${circ}" transform="rotate(${rot} ${c} ${c})"/>
+     </svg>`);
+}
+
+function pager(parent, n, active, dy){
+  const w=document.createElement('div'); w.className='pager';
+  w.style.bottom=dy+'px';
+  for(let i=0;i<n;i++){ const s=document.createElement('span'); s.className='pdot'+(i===active?' cur':''); w.appendChild(s); }
+  parent.appendChild(w);
+}
+
+const chipBgWork="rgba(217,119,87,.20)";
+
+// ───── 总览页：当前固件值 ─────
+(function(){
+  const w=document.getElementById('ov-cur');
+  el(w,{align:'top',dy:70,font:18,chip:1,chipBg:chipBgWork,color:ORANGE,text:'working'});
+  pet(w,233,203);
+  el(w,{align:'center',dy:120,font:36,color:WHITE,text:'2 <span style="color:#5e5e5e;font-size:24px;">/ 3</span>'});
+  el(w,{align:'center',dy:158,font:16,color:GREY,text:'running'});
+  pager(w,4,0,30);
+})();
+
+// ───── 总览页：重新设计 ─────
+(function(){
+  const w=document.getElementById('ov-cal');
+  el(w,{align:'top',dy:104,font:22,chip:1,chipBg:chipBgWork,color:ORANGE,text:'working'});
+  pet(w,233,216);
+  el(w,{align:'center',dy:118,font:44,color:WHITE,text:'2 / 3'});
+  el(w,{align:'center',dy:166,font:20,color:GREY,text:'running'});
+  pager(w,4,0,38);
+})();
+
+// ───── session 页：当前固件值（整圈环压 pager） ─────
+(function(){
+  const w=document.getElementById('se-cur');
+  ringFull(w,396,12,70,ORANGE);
+  el(w,{align:'top',dy:70,font:14,color:DIM,ls:2,text:'SESSION 1 / 3'});
+  el(w,{align:'top',dy:100,font:14,chip:1,chipBg:chipBgWork,color:ORANGE,text:'working'});
+  el(w,{align:'top',dy:150,font:14,color:GREY,text:'sonnet-4.5'});
+  el(w,{align:'center',dy:-2,font:36,color:WHITE,text:'70<span style="color:#5e5e5e;font-size:24px;">%</span>'});
+  el(w,{align:'center',dy:40,font:14,color:DIM,ls:1,text:'CONTEXT USED'});
+  el(w,{align:'bottom',dy:86,font:16,color:GREY,text:'$12.34 · Bash'});
+  pager(w,4,1,30);
+})();
+
+// token 四宫格：2×2，标签灰小 + 数值白稍大。居中在 (cy)，整体宽 gridW
+function tokenGrid(parent, cy, items){
+  const colGap=58, rowGap=42, labelF=13, valF=24;
+  const g=document.createElement('div');
+  g.style.position='absolute'; g.style.left='50%'; g.style.top=cy+'px';
+  g.style.transform='translate(-50%,-50%)';
+  g.style.display='grid';
+  g.style.gridTemplateColumns=`auto auto`;
+  g.style.columnGap=colGap+'px'; g.style.rowGap=rowGap+'px';
+  for(const [label,val] of items){
+    const cell=document.createElement('div'); cell.style.textAlign='center';
+    cell.innerHTML=`<div style="font-size:${valF}px;color:#fff;line-height:1;white-space:nowrap;">${val}</div>`
+                  +`<div style="font-size:${labelF}px;color:#7a7a7a;letter-spacing:.5px;margin-top:4px;white-space:nowrap;">${label}</div>`;
+    g.appendChild(cell);
+  }
+  parent.appendChild(g);
+}
+
+// ───── session 页：重新设计 v4（减法：去 ctx 数字 + 去页码） ─────
+(function(){
+  const w=document.getElementById('se-cal');
+  ringArc(w,430,12,70,ORANGE,100);         // 弧环本身表示 context，无需数字
+  // ① 顶部组：项目标题（醒目）+ 模型 + chip
+  el(w,{align:'top',dy:84,font:22,color:WHITE,text:'claude-code-stopwatch'});
+  el(w,{align:'top',dy:118,font:14,color:GREY,text:'sonnet-4.5'});
+  el(w,{align:'top',dy:146,font:16,chip:1,chipBg:chipBgWork,color:ORANGE,text:'working'});
+  // ② token 四宫格成为视觉主体，居中
+  tokenGrid(w,262,[
+    ['INPUT','15.5k'],['OUTPUT','1.2k'],
+    ['CACHE HIT','82k'],['CACHE WRITE','5.0k'],
+  ]);
+  // ③ 底部缺口：cost + pager
+  el(w,{align:'bottom',dy:64,font:18,color:GREY,text:'$12.34 · Bash'});
+  pager(w,4,1,30);
+})();
+</script>
+</body>
+</html>
