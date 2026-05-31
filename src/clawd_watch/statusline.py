@@ -34,7 +34,7 @@ import urllib.request
 from . import HTTP_HOST, HTTP_PORT
 
 
-def _normalize(payload: dict) -> dict:
+def normalize(payload: dict) -> dict:
     """Pull keys we care about out of a Claude Code statusline JSON."""
     out: dict = {}
 
@@ -94,7 +94,7 @@ def _normalize(payload: dict) -> dict:
     return out
 
 
-def _format_status_line(norm: dict) -> str:
+def format_status_line(norm: dict) -> str:
     parts: list[str] = []
     if "model_name" in norm:
         parts.append(str(norm["model_name"]))
@@ -109,7 +109,7 @@ def _format_status_line(norm: dict) -> str:
     return " · ".join(parts)
 
 
-def _post_to_daemon(norm: dict) -> None:
+def post_to_daemon(norm: dict) -> None:
     """Fire-and-forget POST. Never raises."""
     try:
         data = json.dumps(norm).encode()
@@ -137,11 +137,11 @@ def main() -> int:
         except (json.JSONDecodeError, ValueError):
             payload = {}
 
-    norm = _normalize(payload) if isinstance(payload, dict) else {}
+    norm = normalize(payload) if isinstance(payload, dict) else {}
     if norm:
-        _post_to_daemon(norm)
+        post_to_daemon(norm)
 
-    sys.stdout.write(_format_status_line(norm))
+    sys.stdout.write(format_status_line(norm))
     sys.stdout.write("\n")
     return 0
 
