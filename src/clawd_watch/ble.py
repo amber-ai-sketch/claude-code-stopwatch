@@ -252,8 +252,8 @@ class WatchBLE:
         try:
             if self._client.is_connected:
                 await self._client.disconnect()
-        except Exception:
-            pass
+        except Exception as e:
+            log.debug("disconnect error (ignored): %s", e)
         self._client = None
 
     async def _subscribe_audio(self, client: BleakClient) -> None:

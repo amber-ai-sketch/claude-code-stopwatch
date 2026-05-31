@@ -263,14 +263,14 @@ class Daemon:
         return app
 
     async def _read_payload(self, req: web.Request) -> dict[str, Any]:
+        raw = await req.read()
+        if not raw:
+            return {}
         try:
-            raw = await req.read()
-            if not raw:
-                return {}
             return json.loads(raw)
         except Exception as e:
-            log.warning("bad payload on %s: %s", req.path, e)
-            return {}
+            log.warning("bad JSON payload on %s (%d bytes): %s", req.path, len(raw), e)
+            raise web.HTTPBadRequest(text="invalid JSON body")
 
     async def _on_session_start(self, req: web.Request) -> web.Response:
         p = await self._read_payload(req)
@@ -512,13 +512,13 @@ class Daemon:
 def _setup_logging() -> None:
     try:
         os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"clawd-watch: cannot create log dir: {e}", file=sys.stderr)
     handlers: list[logging.Handler] = [logging.StreamHandler()]
     try:
         handlers.append(logging.FileHandler(LOG_PATH))
-    except Exception:
-        pass
+    except Exception as e:
+        print(f"clawd-watch: cannot open log file {LOG_PATH}: {e}", file=sys.stderr)
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(name)s: %(message)s",
