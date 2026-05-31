@@ -83,7 +83,7 @@ void OverviewPage::update(int sessions_total, int sessions_running, int sessions
         chip_text = "done!"; chip_fg = lv_color_make(0x88, 0xDD, 0x66);
         chip_bg = lv_color_make(0x22, 0x33, 0x11);
     } else {
-        chip_text = "idle"; chip_fg = kGrey;
+        chip_text = "idle"; chip_fg = kDimIdle;
         chip_bg = lv_color_make(0x22, 0x22, 0x22);
     }
     lv_label_set_text(_chip_label, chip_text);

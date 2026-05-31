@@ -141,7 +141,7 @@ void SessionPage::update(int ordinal, int count,
         chip_text = "working"; chip_fg = kOrange;
         chip_bg = kChipBgWorking;
     } else {
-        chip_text = "idle"; chip_fg = kGrey;
+        chip_text = "idle"; chip_fg = kDimIdle;
         chip_bg = lv_color_make(0x22, 0x22, 0x22);
     }
     lv_label_set_text(_chip_label, chip_text);
