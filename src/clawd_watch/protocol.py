@@ -15,6 +15,11 @@ NUS_SERVICE = "6e400001-b5a3-f393-e0a9-e50e24dcca9e"
 NUS_RX = "6e400002-b5a3-f393-e0a9-e50e24dcca9e"  # host → device, write
 NUS_TX = "6e400003-b5a3-f393-e0a9-e50e24dcca9e"  # device → host, notify
 
+# Dedicated audio service: binary PCM frames, NOT the newline-JSON channel.
+# Must match firmware ble_nus.cpp AUDIO_SVC_UUID / AUDIO_TX_UUID.
+AUDIO_SERVICE = "6e40a000-b5a3-f393-e0a9-e50e24dcca9e"
+AUDIO_TX = "6e40a003-b5a3-f393-e0a9-e50e24dcca9e"  # device → host, notify
+
 
 def time_sync_msg() -> dict[str, Any]:
     # [epoch_seconds, timezone_offset_in_seconds_east_of_utc]
@@ -42,6 +47,11 @@ def heartbeat(
     # Tool currently running (busy.bash / busy.edit / busy.web ...). Firmware
     # uses this to pick which motion graphic to render. Cleared on Stop hook.
     current_tool: Optional[str] = None,
+    # Per-session detail array for the device's swipeable detail pages.
+    # Each item: {sid, run, wait, ctx, cost, model, tool, proj, tin, tout,
+    # cr, cw}. Firmware ignores if absent. Sent on its own line when present
+    # to respect the BLE MTU.
+    sessions: Optional[list[dict[str, Any]]] = None,
 ) -> dict[str, Any]:
     out: dict[str, Any] = {
         "total": total,
@@ -51,6 +61,8 @@ def heartbeat(
     }
     if prompt is not None:
         out["prompt"] = prompt
+    if sessions is not None:
+        out["sessions"] = sessions
     # Compact key names + rounding shrink BLE payload.
     if cost_usd is not None:
         out["cost"] = round(cost_usd, 2)
