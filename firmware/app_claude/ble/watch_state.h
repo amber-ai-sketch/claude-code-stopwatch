@@ -70,6 +70,10 @@ struct WatchState {
     // Per-session detail for the swipeable detail pages. Rebuilt on each
     // heartbeat that carries a "sessions" array.
     std::vector<SessionInfo> session_details;
+
+    // Voice transcript echo — last dictated text, shown briefly on-screen.
+    std::string transcript;
+    uint32_t    transcript_at_ms = 0;  // when received, for auto-hide
 };
 
 }  // namespace clawd_watch

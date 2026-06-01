@@ -41,6 +41,15 @@ private:
     void _show_page(int idx);
     static void _on_tap(lv_event_t* e);
 
+    // Cheatsheet overlay (shown on swipe-down from overview).
+    lv_obj_t* _cheatsheet  = nullptr;
+    lv_point_t _swipe_start = {};
+    bool       _swipe_active = false;
+    lv_obj_t* _build_cheatsheet();
+    static void _on_touch_start(lv_event_t* e);
+    static void _on_touch_end(lv_event_t* e);
+    static void _on_cheatsheet_tap(lv_event_t* e);
+
     lv_obj_t* _screen     = nullptr;
     lv_obj_t* _container  = nullptr;    // plain container, holds all pages
     lv_obj_t* _click_mask = nullptr;    // transparent overlay, captures taps
@@ -54,6 +63,12 @@ private:
     int _session_page_count = -1;           // -1 = not built yet
     int _current_page_idx = 0;              // 0 = overview, 1..N = sessions
     int _prev_running = 0;                  // for celebration detection
+
+    // Voice transcript overlay — shows dictated text briefly after recording.
+    lv_obj_t* _transcript_panel = nullptr;
+    lv_obj_t* _transcript_label = nullptr;
+    uint32_t  _transcript_until_ms = 0;     // auto-hide after this time
+    static constexpr uint32_t kTranscriptShowMs = 5000;
 };
 
 }  // namespace clawd_watch

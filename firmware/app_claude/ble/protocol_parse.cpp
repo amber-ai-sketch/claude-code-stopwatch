@@ -37,6 +37,14 @@ bool apply_json_line(const char* line, WatchState& state, uint32_t now_ms)
     // ─── commands ───────────────────────────────────────────────
     const char* cmd = doc["cmd"];
     if (cmd) {
+        // transcript echo: daemon sends the dictated text after voice input.
+        if (strcmp(cmd, "transcript") == 0) {
+            const char* text = doc["text"];
+            if (text) {
+                state.transcript    = text;
+                state.transcript_at_ms = now_ms;
+            }
+        }
         // owner / name / unpair etc — handled at a higher layer (it
         // needs to send acks via NUS). We only mark the link alive.
         state.last_updated_ms = now_ms;

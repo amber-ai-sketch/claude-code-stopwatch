@@ -55,7 +55,7 @@ WatchFace::WatchFace()
     _click_mask = lv_obj_create(_screen);
     lv_obj_remove_style_all(_click_mask);
     lv_obj_set_size(_click_mask, kScreenSize, kScreenSize);
-    lv_obj_set_style_bg_opa(_click_mask, LV_OPA_1, 0);
+    lv_obj_set_style_bg_opa(_click_mask, LV_OPA_TRANSP, 0);
     lv_obj_remove_flag(_click_mask, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(_click_mask, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(_click_mask, _on_tap, LV_EVENT_CLICKED, this);
@@ -63,8 +63,33 @@ WatchFace::WatchFace()
     // Keep pager visible above the click mask.
     lv_obj_move_foreground(_pager);
 
+    // Swipe-down on overview → cheatsheet.
+    lv_obj_add_event_cb(_click_mask, _on_touch_start, LV_EVENT_PRESSED, this);
+    lv_obj_add_event_cb(_click_mask, _on_touch_end,   LV_EVENT_RELEASED, this);
+    _cheatsheet = _build_cheatsheet();
+    lv_obj_move_foreground(_cheatsheet);
+
     _rebuild_pager(1);
     _highlight_pager(0);
+
+    // ── Transcript overlay (hidden initially) ─────────────────
+    _transcript_panel = lv_obj_create(_screen);
+    lv_obj_remove_all_flags(_transcript_panel, LV_OBJ_FLAG_CLICK_FOCUSABLE);
+    lv_obj_remove_flag(_transcript_panel, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_set_size(_transcript_panel, kScreenSize - 40, LV_SIZE_CONTENT);
+    lv_obj_set_style_bg_color(_transcript_panel, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(_transcript_panel, 200, 0);
+    lv_obj_set_style_radius(_transcript_panel, 12, 0);
+    lv_obj_set_style_pad_all(_transcript_panel, 14, 0);
+    lv_obj_align(_transcript_panel, LV_ALIGN_CENTER, 0, 0);
+    lv_obj_add_flag(_transcript_panel, LV_OBJ_FLAG_HIDDEN);
+
+    _transcript_label = lv_label_create(_transcript_panel);
+    lv_obj_set_style_text_font(_transcript_label, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_color(_transcript_label, lv_color_white(), 0);
+    lv_label_set_long_mode(_transcript_label, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(_transcript_label, kScreenSize - 68);
+    lv_label_set_text(_transcript_label, "");
 }
 
 WatchFace::~WatchFace()
@@ -107,6 +132,61 @@ void WatchFace::_highlight_pager(int active)
     }
 }
 
+lv_obj_t* WatchFace::_build_cheatsheet()
+{
+    lv_obj_t* cs = lv_obj_create(_screen);
+    lv_obj_remove_style_all(cs);
+    lv_obj_set_size(cs, kScreenSize, kScreenSize);
+    lv_obj_set_style_bg_color(cs, lv_color_black(), 0);
+    lv_obj_set_style_bg_opa(cs, 210, 0);  // ~82% opacity
+    lv_obj_add_flag(cs, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_add_flag(cs, LV_OBJ_FLAG_HIDDEN);
+    lv_obj_remove_flag(cs, LV_OBJ_FLAG_SCROLLABLE);
+    lv_obj_add_event_cb(cs, _on_cheatsheet_tap, LV_EVENT_CLICKED, this);
+
+    // Title
+    lv_obj_t* title = lv_label_create(cs);
+    lv_obj_set_style_text_font(title, &lv_font_montserrat_22, 0);
+    lv_obj_set_style_text_color(title, lv_color_white(), 0);
+    lv_label_set_text(title, "Buttons");
+    lv_obj_align(title, LV_ALIGN_CENTER, 0, -90);
+
+    // Left A header
+    lv_obj_t* la = lv_label_create(cs);
+    lv_obj_set_style_text_font(la, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_color(la, kOrange, 0);
+    lv_label_set_text(la, "\xe2\x97\x80 A");  // ◀ A
+    lv_obj_align(la, LV_ALIGN_CENTER, 0, -48);
+
+    lv_obj_t* la_desc = lv_label_create(cs);
+    lv_obj_set_style_text_font(la_desc, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(la_desc, kGrey, 0);
+    lv_label_set_text(la_desc, "Tap \xe2\x86\x92 Backspace  \xc2\xb7  Hold \xe2\x86\x92 Enter");
+    lv_obj_align(la_desc, LV_ALIGN_CENTER, 0, -26);
+
+    // Right B header
+    lv_obj_t* rb = lv_label_create(cs);
+    lv_obj_set_style_text_font(rb, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_color(rb, kOrange, 0);
+    lv_label_set_text(rb, "\xe2\x96\xb6 B");  // ▶ B
+    lv_obj_align(rb, LV_ALIGN_CENTER, 0, 16);
+
+    lv_obj_t* rb_desc = lv_label_create(cs);
+    lv_obj_set_style_text_font(rb_desc, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(rb_desc, kGrey, 0);
+    lv_label_set_text(rb_desc, "Tap \xe2\x86\x92 Esc  \xc2\xb7  Hold \xe2\x86\x92 WeChat/Mic");
+    lv_obj_align(rb_desc, LV_ALIGN_CENTER, 0, 38);
+
+    // Screen hint
+    lv_obj_t* hint = lv_label_create(cs);
+    lv_obj_set_style_text_font(hint, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(hint, kDim, 0);
+    lv_label_set_text(hint, "Tap \xe2\x86\x92 next page  \xc2\xb7  Swipe \xe2\x86\x93 \xe2\x86\x92 this screen");
+    lv_obj_align(hint, LV_ALIGN_CENTER, 0, 92);
+
+    return cs;
+}
+
 void WatchFace::_rebuild_session_pages(int count)
 {
     // Drop old session pages.
@@ -128,10 +208,11 @@ void WatchFace::_rebuild_session_pages(int count)
     }
     _session_page_count = count;
 
-    // Session pages were appended to _screen, pushing click_mask and pager
-    // behind them.  Restore z-order so taps still reach the click mask.
+    // Session pages were appended to _screen, pushing click_mask, pager,
+    // and cheatsheet behind them.  Restore z-order.
     lv_obj_move_foreground(_click_mask);
     lv_obj_move_foreground(_pager);
+    if (_cheatsheet) lv_obj_move_foreground(_cheatsheet);
 
     _rebuild_pager(count + 1);   // +1 for the overview page
     // Preserve current page if still valid; otherwise fall back to overview.
@@ -144,6 +225,39 @@ void WatchFace::_on_tap(lv_event_t* e)
 {
     auto* self = static_cast<WatchFace*>(lv_event_get_user_data(e));
     self->next_page();
+}
+
+void WatchFace::_on_touch_start(lv_event_t* e)
+{
+    auto* self = static_cast<WatchFace*>(lv_event_get_user_data(e));
+    lv_indev_get_point(lv_indev_get_act(), &self->_swipe_start);
+    self->_swipe_active = true;
+}
+
+void WatchFace::_on_touch_end(lv_event_t* e)
+{
+    auto* self = static_cast<WatchFace*>(lv_event_get_user_data(e));
+    if (!self->_swipe_active) return;
+    self->_swipe_active = false;
+
+    lv_point_t end;
+    lv_indev_get_point(lv_indev_get_act(), &end);
+
+    int32_t dy = end.y - self->_swipe_start.y;
+    int32_t dx = end.x - self->_swipe_start.x;
+    bool is_swipe_down = (dy > 80) && (LV_ABS(dy) > LV_ABS(dx));
+
+    if (is_swipe_down && self->_current_page_idx == 0 && self->_cheatsheet) {
+        lv_obj_clear_flag(self->_cheatsheet, LV_OBJ_FLAG_HIDDEN);
+    }
+}
+
+void WatchFace::_on_cheatsheet_tap(lv_event_t* e)
+{
+    auto* self = static_cast<WatchFace*>(lv_event_get_user_data(e));
+    if (self->_cheatsheet) {
+        lv_obj_add_flag(self->_cheatsheet, LV_OBJ_FLAG_HIDDEN);
+    }
 }
 
 void WatchFace::next_page()
@@ -224,6 +338,21 @@ void WatchFace::apply(const WatchState& state, bool ble_connected)
     // race (clear before push_back), not an actual session teardown.
     if (n != _session_page_count && !(n == 0 && _session_page_count > 0)) {
         _rebuild_session_pages(n);
+    }
+
+    // ── Transcript overlay ──────────────────────────────────────
+    if (!state.transcript.empty() && state.transcript_at_ms != _transcript_until_ms) {
+        // New transcript arrived — show it.
+        lv_label_set_text(_transcript_label, state.transcript.c_str());
+        lv_obj_clear_flag(_transcript_panel, LV_OBJ_FLAG_HIDDEN);
+        lv_obj_move_foreground(_transcript_panel);
+        lv_obj_move_foreground(_click_mask);
+        lv_obj_move_foreground(_pager);
+        _transcript_until_ms = state.transcript_at_ms + kTranscriptShowMs;
+    }
+    if (_transcript_until_ms && state.last_updated_ms > _transcript_until_ms) {
+        lv_obj_add_flag(_transcript_panel, LV_OBJ_FLAG_HIDDEN);
+        _transcript_until_ms = 0;
     }
 }
 
