@@ -55,7 +55,7 @@ WatchFace::WatchFace()
     _click_mask = lv_obj_create(_screen);
     lv_obj_remove_style_all(_click_mask);
     lv_obj_set_size(_click_mask, kScreenSize, kScreenSize);
-    lv_obj_set_style_bg_opa(_click_mask, LV_OPA_TRANSP, 0);
+    lv_obj_set_style_bg_opa(_click_mask, LV_OPA_1, 0);
     lv_obj_remove_flag(_click_mask, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(_click_mask, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_event_cb(_click_mask, _on_tap, LV_EVENT_CLICKED, this);
@@ -74,7 +74,7 @@ WatchFace::WatchFace()
 
     // ── Transcript overlay (hidden initially) ─────────────────
     _transcript_panel = lv_obj_create(_screen);
-    lv_obj_remove_all_flags(_transcript_panel, LV_OBJ_FLAG_CLICK_FOCUSABLE);
+    lv_obj_remove_flag(_transcript_panel, LV_OBJ_FLAG_CLICK_FOCUSABLE);
     lv_obj_remove_flag(_transcript_panel, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_set_size(_transcript_panel, kScreenSize - 40, LV_SIZE_CONTENT);
     lv_obj_set_style_bg_color(_transcript_panel, lv_color_black(), 0);
