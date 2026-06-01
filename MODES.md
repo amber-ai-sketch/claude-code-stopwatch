@@ -32,20 +32,25 @@ stopwatch **不录音**，只当一个无线按钮。按键 → BLE 发 NUS 命�
 
 ## 模式二：stopwatch mic 真无线录音
 
-stopwatch 板载 MEMS 麦录音 → 传到 Mac → STT 转文字。两个待定轴：
+stopwatch 板载 MEMS 麦录音 → 传到 Mac → STT 转文字。两个待定轴**已拍板**，
+详细落地方案见 [docs/MODE2_PLAN.md](docs/MODE2_PLAN.md)。
 
-### 轴 A：传输层（蓝牙 vs WiFi）
-- **蓝牙**：本次已验证**能传通**——0 丢包 / 120kbps / MTU 255。
-  但同步「录一块→发一块」模型有 **15% 录音盲区**（发送占用的时间麦没在录）→ 滴滴声 + 卡顿。
-  修法 = I2S DMA 后台连续采样（录音与发送解耦）。这是计划 OV#1 早预警的架构缺陷。
-- **WiFi**（用户提的退路）：家里 WiFi 环境下吞吐和盲区都不是问题，ESP32 推流到 Mac。
-  **绕开蓝牙同步模型的盲区**，不用跟 DMA 死磕。代价：依赖局域网、要搭 socket 推流。
+### 轴 A：传输层 → **选定 WiFi TCP 推流**
+- **WiFi（选定）**：家里 WiFi 吞吐足、盲区可忽略，ESP32 推流到 Mac，绕开蓝牙同步模型的录音盲区。
+  代价：依赖局域网、要搭 socket 推流。
+- ~~蓝牙~~：已验证能传通（0 丢包 / 120kbps / MTU 255），但同步「录一块→发一块」有 15% 录音盲区，
+  根治要 I2S DMA 后台采集（真硬骨头）。**暂不走**，相关代码（`audio_recorder` / `audio_frame` / audio characteristic）保留备用。
 
-### 轴 B：STT 后端
-- **① 云端 API**：接现成中文 STT 服务。准、省事，但要网络 + key + 隐私考量。
-- **② 端侧中文模型**：Mac 本地跑中文识别模型。离线、隐私好，但要下模型 + 本地算力。
+### 轴 B：STT 后端 → **选定小米 MiMo 多模态（凑合）**
+- **MiMo（选定）**：`mimo-v2.5`，走 token plan 网关 `token-plan-cn.xiaomimimo.com`，`api-key` 头，
+  整段 WAV base64 上传。它是多模态 LLM 不是 ASR，靠 `<t></t>` 标记 prompt 逼稳定输出（已实测）。不挑采样率（免重采样）。
+- ~~专用 `mimo-v2.5-asr`~~：质量最对口但**只开源无托管 API**，要本地部署，等于端侧方案，暂不走。
+- ~~端侧中文模型 / 火山讯飞云 ASR~~：备选，MiMo 改写严重时再换。详见 [docs/MODE2_PLAN.md](docs/MODE2_PLAN.md)。
 
-### 工作量：大。研究性，传输和 STT 各有分叉，往后做。
+### 转写后：Unicode 直接注入（不碰微信输入法）
+拿到文字后用 `CGEventKeyboardSetUnicodeString` 注入 Claude Code 输入框，绕开模式一所有「键盘注入打断微信 IME」的坑。
+
+### 工作量：中。WiFi 链路 + STT 接入是新代码，但 PCM/WAV/transcript 回显基建已就位。分 4 阶段见 MODE2_PLAN.md。
 
 ## 模式切换 UI
 
