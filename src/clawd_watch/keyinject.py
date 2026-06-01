@@ -30,6 +30,7 @@ KEY_CODES = {
     "tab":        0x30,
     "a":          0x00,
     "c":          0x08,
+    "left":       0x7B,
 }
 
 # Real key codes for the LEFT modifier keys. WeChat's hold-to-talk hotkey
@@ -175,15 +176,32 @@ def _pbcopy(text: str) -> None:
         log.warning("pbcopy failed: %s", e)
 
 
-def read_focused_text() -> str:
-    """Select-all + copy from the focused input, return its text, restore clipboard.
+def _select_line() -> None:
+    """Select current line via Cmd+Shift+Left (from cursor to line start)."""
+    Q = _quartz()
+    cmd_flags = MOD_FLAGS["cmd"]
+    shift_flags = MOD_FLAGS["shift"]
+    combined = cmd_flags | shift_flags
+    left = KEY_CODES["left"]
+    cmd_key = MOD_KEYCODES["cmd"]
+    shift_key = MOD_KEYCODES["shift"]
+    _post(cmd_key, True, combined)
+    _post(shift_key, True, combined)
+    _post(left, True, combined)
+    _post(left, False, combined)
+    _post(shift_key, False, 0)
+    _post(cmd_key, False, 0)
 
-    Simulates Cmd+A then Cmd+C to grab whatever is in the currently focused
-    text field. Restores the original clipboard content afterwards so the user
-    doesn't notice the swap. Returns the captured text (may be empty).
+
+def read_focused_text() -> str:
+    """Select current line + copy, return its text, restore clipboard.
+
+    Uses Cmd+Shift+Left to select from cursor to line start (not the entire
+    terminal buffer), then Cmd+C to copy. Restores the original clipboard
+    content afterwards. Returns the captured text (may be empty).
     """
     saved = _pbpaste()
-    key_tap("cmd", "a")
+    _select_line()
     key_tap("cmd", "c")
     text = _pbpaste()
     if saved:

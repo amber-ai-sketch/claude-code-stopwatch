@@ -20,8 +20,13 @@
   - 会瞬间改变输入框选中态 + 覆盖剪贴板（用完恢复，但有竞态窗口）。
   - 读到的是输入框**全部**内容，不只是新听写那句（除非能定位增量）。
   - 466px 圆屏放不下长句，需截断或滚动显示。
-- **Depends on**: 模式一（已就绪）。
-- **Start**: daemon `_handle_button` 的 right `up`（trigger 模式）分支里，注入 Shift+Space 停录后，延迟一小会儿等微信上屏完成，再走 Cmd+A/Cmd+C 读剪贴板 → 经 NUS 发一条新命令（如 `{"cmd":"transcript","text":"..."}`）给手表 → 固件加显示逻辑。注意恢复剪贴板。
+- **已实测失败（2026-06-01）**:
+  - 方案 A：500ms 延迟后 `Cmd+A` + `Cmd+C`。结果：`Cmd+A` 选中了终端整个 scrollback（30K 字符），不是听写文字。
+  - 方案 B：改用 `Cmd+Shift+Left`（选当前行）替代 `Cmd+A`。结果：键盘注入打断了微信语音输入过程，导致听写被中断。即使延迟 500ms，额外的按键事件仍会干扰 WeChat 的转写流程。
+  - **根因推测**：`CGEventPost` 注入的按键事件和 WeChat IME 的内部状态有冲突。WeChat 可能还在处理 Shift+Space 的释放，此时注入 Cmd 系列按键会破坏其状态机。
+  - **结论**：在 button up 之后注入任何键盘事件都有风险干扰 WeChat。纯键盘注入方案走不通，需要找完全不碰键盘的读取方式。
+- **Depends on**: 找到不干扰 WeChat 的文本读取方案。
+- **备选方向**: (1) Accessibility API 读终端文本（已知 Ghostty 不支持）；(2) 直接读 Ghostty 的 GPU buffer（需要 Ghostty 自己暴露接口）；(3) 换用支持 AX 的终端（iTerm2/Terminal.app）；(4) 不做回显，改为在手表上显示"录音完成"确认。
 
 ## 手表在 Claude 等待用户输入时刷成"等待"态
 
