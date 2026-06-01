@@ -11,15 +11,33 @@ silently exit 0.
 from __future__ import annotations
 
 import json
+import os
 import sys
 import urllib.error
+from datetime import datetime
 
 from . import HOOK_REQUEST_TIMEOUT
 from .http_client import daemon_post
 
+_NOTIFICATION_LOG = os.path.expanduser("~/.claude/notification.log")
+
 
 def _post(event: str, payload: dict) -> dict:
     return daemon_post(f"/{event}", payload, timeout=HOOK_REQUEST_TIMEOUT)
+
+
+def _log_notification(payload: dict) -> None:
+    """Append Notification event to a log file for debugging."""
+    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    ntype = payload.get("type", "?")
+    msg = payload.get("message", "")
+    sid = payload.get("session_id", "?")
+    line = f"[{ts}] type={ntype} sid={sid} msg={msg}\n"
+    try:
+        with open(_NOTIFICATION_LOG, "a") as f:
+            f.write(line)
+    except OSError:
+        pass  # best-effort
 
 
 def _emit_pretool_decision(decision: str, reason: str) -> None:
@@ -48,6 +66,11 @@ def main() -> int:
     except Exception as e:
         sys.stderr.write(f"clawd-watch-hook: bad stdin json: {e}\n")
         payload = {}
+
+    # Log Notification events for debugging (before POST, so it works even
+    # if daemon is down).
+    if event == "Notification":
+        _log_notification(payload)
 
     # Bypass mode: --dangerously-skip-permissions. Don't bounce decisions
     # off the device.
