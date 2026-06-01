@@ -45,7 +45,7 @@ from .audio_receiver import AudioCapture, AudioFrameError, TYPE_STREAM_START
 from .ble import WatchBLE
 from .config import load_address, save_address
 from .endpoints import register_routes
-from .keyinject import key_down, key_up
+from .keyinject import key_down, key_up, read_focused_text
 from .protocol import generic_ack, heartbeat, status_ack
 from .state import State
 
@@ -118,7 +118,7 @@ class Daemon:
             return
 
         if cmd == "btn":
-            self._handle_button(msg.get("key", ""), msg.get("edge", ""))
+            await self._handle_button(msg.get("key", ""), msg.get("edge", ""))
             return
 
         if cmd in ("name", "owner", "unpair"):
@@ -127,7 +127,7 @@ class Daemon:
 
         log.debug("unhandled device message: %s", msg)
 
-    def _handle_button(self, key: str, edge: str) -> None:
+    async def _handle_button(self, key: str, edge: str) -> None:
         if key != "right" or edge not in ("down", "up"):
             log.warning("unhandled btn event: key=%r edge=%r", key, edge)
             return
@@ -137,6 +137,7 @@ class Daemon:
                 key_down("shift", "space")
             else:
                 key_up("shift", "space")
+                asyncio.create_task(self._echo_transcript())
             return
 
         if self.mode == "mic":
@@ -144,6 +145,30 @@ class Daemon:
             return
 
         raise ValueError(f"unknown mode: {self.mode!r}")
+
+    # ─── transcript echo ────────────────────────────────────────
+
+    async def _echo_transcript(self) -> None:
+        """After voice recording stops, read the transcribed text from the
+        focused input via clipboard and send it to the watch."""
+        await asyncio.sleep(0.5)  # wait for WeChat to finish transcribing
+        try:
+            text = await asyncio.get_event_loop().run_in_executor(
+                None, read_focused_text
+            )
+        except Exception as e:
+            log.warning("transcript read failed: %s", e)
+            return
+        if not text.strip():
+            log.debug("transcript echo: empty, skipping")
+            return
+        # Truncate for the 466px round screen (≈40 chars per line, 3 lines max).
+        truncated = text.strip()[:120]
+        try:
+            await self.ble.send({"cmd": "transcript", "text": truncated})
+            log.info("transcript echo: sent %d chars", len(truncated))
+        except Exception as e:
+            log.warning("transcript send failed: %s", e)
 
     # ─── audio ─────────────────────────────────────────────────
 

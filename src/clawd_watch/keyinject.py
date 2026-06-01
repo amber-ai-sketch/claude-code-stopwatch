@@ -15,6 +15,7 @@ user once; after that the grant persists across restarts.
 from __future__ import annotations
 
 import logging
+import subprocess
 from typing import Optional
 
 log = logging.getLogger("clawd_watch.keyinject")
@@ -27,6 +28,7 @@ KEY_CODES = {
     "enter":      0x24,  # Return
     "esc":        0x35,
     "tab":        0x30,
+    "a":          0x00,
     "c":          0x08,
 }
 
@@ -152,3 +154,39 @@ def release_all_modifiers() -> None:
     for keycode in MOD_KEYCODES.values():
         _post(keycode, False, 0)
     log.info("released all modifiers")
+
+
+# ─── clipboard helpers (for transcript echo) ────────────────────
+
+def _pbpaste() -> str:
+    """Read current clipboard content via pbpaste."""
+    try:
+        return subprocess.check_output(["pbpaste"], timeout=2).decode("utf-8", errors="replace")
+    except (subprocess.SubprocessError, OSError) as e:
+        log.warning("pbpaste failed: %s", e)
+        return ""
+
+
+def _pbcopy(text: str) -> None:
+    """Write text to clipboard via pbcopy."""
+    try:
+        subprocess.run(["pbcopy"], input=text.encode("utf-8"), timeout=2, check=True)
+    except (subprocess.SubprocessError, OSError) as e:
+        log.warning("pbcopy failed: %s", e)
+
+
+def read_focused_text() -> str:
+    """Select-all + copy from the focused input, return its text, restore clipboard.
+
+    Simulates Cmd+A then Cmd+C to grab whatever is in the currently focused
+    text field. Restores the original clipboard content afterwards so the user
+    doesn't notice the swap. Returns the captured text (may be empty).
+    """
+    saved = _pbpaste()
+    key_tap("cmd", "a")
+    key_tap("cmd", "c")
+    text = _pbpaste()
+    if saved:
+        _pbcopy(saved)
+    log.info("read_focused_text: captured %d chars", len(text))
+    return text
