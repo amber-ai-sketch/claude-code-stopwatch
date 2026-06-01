@@ -18,6 +18,7 @@ constexpr int kCy = kScreen / 2;
 
 OverviewPage::OverviewPage(lv_obj_t* parent)
 {
+    _root = parent;
     lv_obj_set_style_bg_color(parent, lv_color_black(), 0);
     lv_obj_set_style_bg_opa(parent, LV_OPA_COVER, 0);
 
@@ -61,8 +62,23 @@ OverviewPage::~OverviewPage()
 }
 
 void OverviewPage::update(int sessions_total, int sessions_running, int sessions_waiting,
-                          std::optional<ClawdState> override_state)
+                          std::optional<ClawdState> override_state,
+                          bool ble_connected)
 {
+    // BLE disconnected: show reconnecting state, override everything.
+    if (!ble_connected) {
+        lv_label_set_text(_chip_label, "reconnecting");
+        lv_obj_set_style_text_color(_chip_label, kDimIdle, 0);
+        lv_obj_set_style_bg_color(_chip, kChipBgIdle, 0);
+        lv_label_set_text(_count, "—");
+        lv_label_set_text(_count_sub, "searching");
+        if (_shown != ClawdState::Idle) {
+            _pet->set_state(ClawdState::Idle);
+            _shown = ClawdState::Idle;
+        }
+        return;
+    }
+
     // Decide state. Override takes priority (e.g. Celebrate), then
     // waiting > working > idle.
     ClawdState state = override_state.value_or(

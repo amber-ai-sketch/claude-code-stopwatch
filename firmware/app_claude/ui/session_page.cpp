@@ -65,12 +65,13 @@ SessionPage::SessionPage(lv_obj_t* parent)
     lv_label_set_text(_title, "—");
     lv_obj_align(_title, LV_ALIGN_TOP_MID, 0, 84);
 
-    // Model.
+    // Model — sits just above the footer ($cost · tool) at the bottom,
+    // away from the title area so long session names never overlap it.
     _model = lv_label_create(parent);
     lv_obj_set_style_text_font(_model, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(_model, kGrey, 0);
     lv_label_set_text(_model, "—");
-    lv_obj_align(_model, LV_ALIGN_TOP_MID, 0, 118);
+    lv_obj_align(_model, LV_ALIGN_BOTTOM_MID, 0, -44);
 
     // Status chip.
     _chip = lv_obj_create(parent);
@@ -114,6 +115,7 @@ SessionPage::SessionPage(lv_obj_t* parent)
 
 void SessionPage::update(int ordinal, int count,
                          ClawdState state,
+                         const std::string& title,
                          const std::string& project,
                          const std::string& model,
                          float ctx_pct,
@@ -128,7 +130,11 @@ void SessionPage::update(int ordinal, int count,
     (void)count;
     char buf[64];
 
-    lv_label_set_text(_title, project.empty() ? "session" : project.c_str());
+    // Display title priority: title (session_name/worktree/agent) > project > "session".
+    const char* display_title = !title.empty() ? title.c_str()
+                                : !project.empty() ? project.c_str()
+                                : "session";
+    lv_label_set_text(_title, display_title);
     lv_label_set_text(_model, model.empty() ? "—" : model.c_str());
 
     // Chip.
@@ -149,9 +155,10 @@ void SessionPage::update(int ordinal, int count,
     lv_obj_set_style_bg_color(_chip, chip_bg, 0);
 
     // Context ring (silent — no numeric readout).
-    // When context is unknown (negative), dim the ring to distinguish
-    // "no data" from "0% full".
-    if (ctx_pct >= 0.0f) {
+    // Dim when idle or context unknown — ring only draws attention when
+    // the session is active and context data is available.
+    bool ring_active = (ctx_pct >= 0.0f) && (state != ClawdState::Idle);
+    if (ring_active) {
         lv_arc_set_value(_ring, (int32_t)ctx_pct);
         lv_obj_set_style_arc_color(_ring, kOrange, LV_PART_INDICATOR);
     } else {

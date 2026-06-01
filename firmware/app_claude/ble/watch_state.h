@@ -25,7 +25,8 @@ struct SessionInfo {
     bool   cost_valid  = false;
     std::string model;
     std::string tool;
-    std::string project;      // workspace dir basename, shown as the page title
+    std::string title;        // session_name > worktree_name > agent_name > project
+    std::string project;      // workspace dir basename, fallback
     // Live context-window token counts (current_usage). -1 = unknown.
     int32_t input_tokens        = -1;
     int32_t output_tokens       = -1;

@@ -95,6 +95,7 @@ bool apply_json_line(const char* line, WatchState& state, uint32_t now_ms)
             if (m.is<float>() || m.is<int>()) { info.cost_usd = m.as<float>(); info.cost_valid = true; }
             info.model   = sv(so["model"]);
             info.tool    = sv(so["tool"]);
+            info.title   = sv(so["title"]);
             info.project = sv(so["proj"]);
             if (so["tin"].is<int>())  info.input_tokens        = so["tin"].as<int>();
             if (so["tout"].is<int>()) info.output_tokens       = so["tout"].as<int>();

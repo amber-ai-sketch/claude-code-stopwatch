@@ -37,8 +37,11 @@ public:
     // ordinal/count are 1-based (kept for API symmetry; not shown anymore).
     // ctx_pct < 0 means unknown. cost < 0 means unknown. token counts < 0
     // mean unknown (the cell shows "—").
+    // title is the preferred display name (session_name > worktree_name >
+    // agent_name); project is the fallback (workspace dir basename).
     void update(int ordinal, int count,
                 ClawdState state,
+                const std::string& title,
                 const std::string& project,
                 const std::string& model,
                 float ctx_pct,

@@ -73,6 +73,10 @@ static volatile uint32_t s_current_passkey = 0;
 static ble_nus_rx_line_cb s_rx_cb = nullptr;
 static void*              s_rx_user = nullptr;
 
+// Advertising speed mode. Fast = 30-60ms (prompt discovery), slow = 1-2s
+// (power-saving while disconnected and idle). Changed by ble_nus_set_adv_fast().
+static volatile bool s_adv_fast = true;
+
 // Line accumulator for inbound writes. NUS is a stream, daemon may
 // fragment a single JSON line across multiple writes. Sized for the
 // largest heartbeat: 8 sessions (MAX_DEVICE_SESSIONS) each carrying
@@ -266,10 +270,14 @@ static void start_advertising(void)
     struct ble_gap_adv_params adv_params = {};
     adv_params.conn_mode = BLE_GAP_CONN_MODE_UND;
     adv_params.disc_mode = BLE_GAP_DISC_MODE_GEN;
-    // Fast advertising interval (~30ms) so macOS Bluetooth UI sees us
-    // promptly during discovery. NimBLE units are 0.625ms.
-    adv_params.itvl_min = 0x30;  // 30 ms
-    adv_params.itvl_max = 0x60;  // 60 ms
+    // NimBLE units are 0.625ms. Fast = 30-60ms, slow = 1-2s.
+    if (s_adv_fast) {
+        adv_params.itvl_min = 0x30;  // 30 ms
+        adv_params.itvl_max = 0x60;  // 60 ms
+    } else {
+        adv_params.itvl_min = 0x640;  // 1000 ms
+        adv_params.itvl_max = 0xC80;  // 2000 ms
+    }
     // Use the random address we generated in on_sync(). Switching from
     // PUBLIC to RANDOM also matters for macOS to forget the old cache.
     rc = ble_gap_adv_start(BLE_OWN_ADDR_RANDOM, nullptr, BLE_HS_FOREVER,
@@ -311,6 +319,7 @@ static int gap_event_handler(struct ble_gap_event* event, void* /*arg*/)
         s_mtu = 0;
         s_current_passkey = 0;
         s_rx_len = 0;
+        s_adv_fast = true;  // fast adv for quick reconnect window
         start_advertising();
         break;
 
@@ -484,6 +493,18 @@ void ble_nus_start_adv(void)
 {
     if (ble_gap_adv_active()) return;
     start_advertising();
+}
+
+void ble_nus_set_adv_fast(bool fast)
+{
+    if (s_adv_fast == fast) return;
+    s_adv_fast = fast;
+    // Restart advertising with new interval (no-op if connected / not advertising).
+    if (ble_gap_adv_active()) {
+        ble_gap_adv_stop();
+        start_advertising();
+    }
+    ESP_LOGI(TAG, "adv %s", fast ? "fast" : "slow");
 }
 
 void ble_nus_init(void)

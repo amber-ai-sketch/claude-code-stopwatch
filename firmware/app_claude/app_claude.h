@@ -19,6 +19,7 @@
 #include "ui/watch_face.h"
 #include <apps/common/key_manager/key_manager.h>
 #include <mooncake.h>
+#include <atomic>
 #include <memory>
 
 // Forward declaration for types that don't appear in unique_ptr members yet.
@@ -53,4 +54,15 @@ private:
 
     // M5 HID input: button → NUS command dispatcher.
     clawd_watch::HidDispatcher _hid;
+
+    // Screen auto-dim: 30s no button/touch/BLE → backlight off, any activity → restore.
+    uint32_t _last_activity_ms   = 0;
+    bool     _screen_dimmed      = false;
+    int      _saved_brightness   = 0;
+    static constexpr uint32_t kScreenDimMs = 30000;
+
+    // BLE disconnect tracking: slow advertising after 30s, boost on interaction.
+    uint32_t _ble_lost_since = 0;  // 0 = connected or not yet tracked
+    bool     _adv_slow       = false;
+    static constexpr uint32_t kAdvSlowMs = 30000;  // switch to slow adv after 30s
 };

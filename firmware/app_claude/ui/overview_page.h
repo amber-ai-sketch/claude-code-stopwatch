@@ -28,9 +28,13 @@ public:
     ~OverviewPage();
 
     void update(int sessions_total, int sessions_running, int sessions_waiting,
-                std::optional<ClawdState> override_state = std::nullopt);
+                std::optional<ClawdState> override_state = std::nullopt,
+                bool ble_connected = true);
+
+    lv_obj_t* lvobj() const { return _root; }
 
 private:
+    lv_obj_t* _root = nullptr;
     lv_obj_t* _ring       = nullptr;  // soft breathing arc (working/waiting)
     lv_obj_t* _chip       = nullptr;  // rounded status pill
     lv_obj_t* _chip_label = nullptr;

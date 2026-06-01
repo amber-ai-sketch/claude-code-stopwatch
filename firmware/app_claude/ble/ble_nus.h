@@ -63,6 +63,11 @@ uint16_t ble_nus_current_mtu(void);
 // flight or already complete. Read by the LVGL pairing UI.
 uint32_t ble_nus_current_passkey(void);
 
+// Switch advertising interval. fast=true → 30-60ms (prompt discovery),
+// fast=false → 1000-2000ms (power-saving while idle/disconnected).
+// No-op if already in the requested mode or if currently connected.
+void ble_nus_set_adv_fast(bool fast);
+
 #ifdef __cplusplus
 }
 #endif

@@ -29,11 +29,17 @@ namespace {
 // onRunning(). Trivially safe because the writes are short and the
 // reads happen on the next LVGL tick at worst — slightly torn strings
 // only flicker the screen, never corrupt anything.
+// BLE callback also signals screen-dim activity so that state changes
+// (e.g. timer start from Mac) wake the display. Static because the
+// callback signature only accepts a single void* user (the WatchState).
+static std::atomic<bool> s_ble_rx_activity{false};
+
 void on_nus_rx_line(const char* line, size_t /*len*/, void* user)
 {
     auto* state = static_cast<WatchState*>(user);
     if (!state || !line) return;
     apply_json_line(line, *state, 0);
+    s_ble_rx_activity.store(true, std::memory_order_relaxed);
 }
 
 }  // namespace
@@ -63,9 +69,13 @@ void AppClaude::onOpen()
     {
         LvglLockGuard lock;
         _face = std::make_unique<WatchFace>();
-        _face->apply(_state);
+        _face->apply(_state, ble_nus_is_connected());
         _face->show();
     }
+
+    // Kick the screen-dim timer so it doesn't dim immediately on boot.
+    _last_activity_ms = GetHAL().millis();
+    _screen_dimmed    = false;
 }
 
 void AppClaude::onRunning()
@@ -84,25 +94,67 @@ void AppClaude::onRunning()
 
     // Log press/release edges to trace the input → NUS path.
     static bool last_r = false, last_l = false;
-    if (right_pressed != last_r) {
+    bool edge_r = (right_pressed != last_r);
+    bool edge_l = (left_pressed  != last_l);
+    if (edge_r) {
         mclog::tagInfo(getAppInfo().name, "right={}", (int)right_pressed);
         last_r = right_pressed;
     }
-    if (left_pressed != last_l) {
+    if (edge_l) {
         mclog::tagInfo(getAppInfo().name, "left={}", (int)left_pressed);
         last_l = left_pressed;
     }
 
     _hid.tick(left_pressed, right_pressed, GetHAL().millis());
 
+    // ── Screen auto-dim ──
+    // Track activity from button edges, touch, and BLE data.
+    // Charging = USB power present → never dim; restore if we just plugged in.
+    uint32_t now = GetHAL().millis();
+    bool charging = GetHAL().isBatteryCharging();
+    bool touch_active = GetHAL().getTouchPoint().num > 0;
+    bool has_activity = charging || edge_r || edge_l || touch_active
+                     || s_ble_rx_activity.exchange(false, std::memory_order_relaxed);
+    if (has_activity) {
+        _last_activity_ms = now;
+        if (_screen_dimmed) {
+            GetHAL().setBackLightBrightness(_saved_brightness);
+            _screen_dimmed = false;
+        }
+    } else if (!_screen_dimmed && (now - _last_activity_ms > kScreenDimMs)) {
+        _saved_brightness = GetHAL().getBackLightBrightness();
+        GetHAL().setBackLightBrightness(0);
+        _screen_dimmed = true;
+    }
+
+    // ── BLE disconnect detection + power-saving advertising ──
+    bool ble_ok = ble_nus_is_connected();
+    if (ble_ok) {
+        _ble_lost_since = 0;
+        _adv_slow       = false;
+    } else {
+        if (_ble_lost_since == 0) _ble_lost_since = now;
+        // After 30s disconnected, switch to slow advertising to save power.
+        if (!_adv_slow && (now - _ble_lost_since > kAdvSlowMs)) {
+            ble_nus_set_adv_fast(false);
+            _adv_slow = true;
+        }
+        // User interaction while disconnected: boost advertising for 30s.
+        bool user_active = edge_r || edge_l || touch_active;
+        if (user_active && _adv_slow) {
+            ble_nus_set_adv_fast(true);
+            _adv_slow       = false;
+            _ble_lost_since = now;  // restart 30s countdown
+        }
+    }
+
     // Apply BLE state to UI ~5x/s. LVGL is mutex-protected so we have to
     // grab the lock; doing this every loop iteration would stall.
-    uint32_t now = GetHAL().millis();
     if (now - _last_ui_apply_ms > 200) {
         _last_ui_apply_ms = now;
         if (_face) {
             LvglLockGuard lock;
-            _face->apply(_state);
+            _face->apply(_state, ble_ok);
         }
     }
 
