@@ -206,6 +206,6 @@ def test_heartbeat_snapshot_session_detail_fields():
     assert detail["cost"] == 2.50
     assert detail["ctx"] == 80.0
     assert detail["model"] == "claude-sonnet-4-6"
-    assert detail["proj"] == "my-project"
+    assert detail["title"] == "my-project"
     assert detail["tin"] == 1000
     assert detail["tout"] == 500

@@ -6,7 +6,7 @@ and can't fight the daemon for the radio. It polls /status every few seconds to
 keep the title icon honest, and the menu items map to /scan, /reconnect,
 /forget, /connect and a launchd restart.
 
-Title icon:  🟢 connected   🔴 disconnected   🟡 scanning   ⚪ daemon down
+Title:  ⚪ daemon down  ·  🔴 disconnected  ·  🟡 scanning  ·  🟢 connected
 """
 from __future__ import annotations
 
@@ -27,48 +27,54 @@ POLL_SECONDS = 3
 
 class ClawdWatchMenuBar(rumps.App):
     def __init__(self) -> None:
-        super().__init__("Clawd", title="⚪ Clawd", quit_button="退出")
+        super().__init__("Clawd", title="⚪ Clawd", quit_button=None)
 
-        # Status rows (read-only, refreshed each poll).
+        # ── status rows (read-only, refreshed each poll) ──────────
         self._link_row = rumps.MenuItem("启动中…")
         self._addr_row = rumps.MenuItem("")
-        self._info_row = rumps.MenuItem("")   # model + cost, combined
-        self._ctx_row = rumps.MenuItem("")    # context % + rate limits
+        self._info_row = rumps.MenuItem("")
+        self._ctx_row = rumps.MenuItem("")
+        self._proj_row = rumps.MenuItem("")
 
-        # Mode toggle.
+        # ── mode toggle ───────────────────────────────────────────
         self._mode_trigger = rumps.MenuItem("遥控器", callback=self._on_mode_trigger)
         self._mode_mic = rumps.MenuItem("录音", callback=self._on_mode_mic)
         self._mode_menu = rumps.MenuItem("模式")
         self._mode_menu.add(self._mode_trigger)
         self._mode_menu.add(self._mode_mic)
 
-        # Nearby devices submenu.
+        # ── nearby devices submenu ────────────────────────────────
         self._nearby = rumps.MenuItem("附近设备")
 
+        # ── menu layout ───────────────────────────────────────────
+        # Native macOS style: plain text, native separators only.
         self.menu = [
             self._link_row,
             self._addr_row,
             None,
-            self._mode_menu,
-            None,
             self._info_row,
             self._ctx_row,
+            self._proj_row,
             None,
+            self._mode_menu,
             rumps.MenuItem("扫描附近设备…", callback=self._on_scan),
             self._nearby,
             rumps.MenuItem("重新连接", callback=self._on_reconnect),
+            None,
             rumps.MenuItem("忘记此设备", callback=self._on_forget),
             rumps.MenuItem("重启后台服务", callback=self._on_restart),
             rumps.MenuItem("查看日志", callback=self._on_logs),
+            None,
+            rumps.MenuItem("退出 Clawd", callback=rumps.quit_application),
         ]
 
         # Set by the scan worker thread, consumed on the next poll tick.
         self._scan_result: list | None = None
-        self._scan_done = False  # explicit handoff flag (thread-safe pattern)
+        self._scan_done = False
 
         rumps.Timer(self._poll, POLL_SECONDS).start()
 
-    # ─── periodic refresh (main thread) ────────────────────────
+    # ─── periodic refresh (main thread) ──────────────────────────
 
     def _poll(self, _timer) -> None:
         if self._scan_result is not None:
@@ -80,50 +86,77 @@ class ClawdWatchMenuBar(rumps.App):
         except (urllib.error.URLError, OSError):
             self.title = "⚪ Clawd"
             self._link_row.title = "服务未运行"
-            self._addr_row.title = "选择「重启后台服务」"
-            self._info_row.title = "—"
+            self._addr_row.title = "选择「重启后台服务」恢复"
+            self._info_row.title = ""
             self._ctx_row.title = ""
+            self._proj_row.title = ""
             return
 
         connected = status.get("connected", False)
         if self._scan_done:
-            self.title = "🟡 Clawd"
+            self.title = "🟡 扫描中"
             self._scan_done = False
+        elif connected:
+            self._update_connected_title(status)
         else:
-            self.title = "🟢 Clawd" if connected else "🔴 Clawd"
+            self.title = "🔴 未连接"
 
+        # ── connection row ────────────────────────────────────────
         if connected:
-            self._link_row.title = f"● 已连接  {status.get('device_name') or '设备'}"
+            self._link_row.title = f"已连接  {status.get('device_name') or '设备'}"
         else:
-            self._link_row.title = "○ 未连接 — 重试中…"
+            self._link_row.title = "未连接 — 重试中…"
 
         address = status.get("address")
         self._addr_row.title = f"地址 …{address[-8:]}" if address else "未保存设备"
 
-        # Combined info line: "model $cost" or just "model" or "—".
+        # ── session info ──────────────────────────────────────────
         sl = status.get("statusline") or {}
+
         parts = []
         if sl.get("model_name"):
             parts.append(sl["model_name"])
         if sl.get("cost_usd") is not None:
             parts.append(f"${sl['cost_usd']:.2f}")
-        self._info_row.title = "  ".join(parts) if parts else "—"
+        self._info_row.title = "  ".join(parts) if parts else ""
 
-        # Context + rate limits on one line.
         ctx_parts = []
         ctx = sl.get("context_pct")
         if ctx is not None:
             ctx_parts.append(f"上下文 {ctx:.0f}%")
         r5h = sl.get("rate_5h_pct")
         if r5h is not None:
-            ctx_parts.append(f"5h {r5h:.0f}%")
-        self._ctx_row.title = "  ·  ".join(ctx_parts) if ctx_parts else ""
+            ctx_parts.append(f"5h 速率限制 {r5h:.0f}%")
+        self._ctx_row.title = " · ".join(ctx_parts) if ctx_parts else ""
 
+        project = sl.get("project")
+        self._proj_row.title = project if project else ""
+
+        # ── mode toggle ───────────────────────────────────────────
         mode = status.get("mode", "trigger")
         self._mode_trigger.state = 1 if mode == "trigger" else 0
         self._mode_mic.state = 1 if mode == "mic" else 0
 
-    # ─── menu actions ──────────────────────────────────────────
+    def _update_connected_title(self, status: dict) -> None:
+        """Pick the most useful compact info for the menu-bar title."""
+        daily = status.get("daily") or {}
+        tokens = daily.get("tokens", 0)
+        cost = daily.get("cost_usd", 0)
+
+        parts = []
+        if tokens:
+            if tokens >= 1_000_000:
+                parts.append(f"{tokens / 1_000_000:.1f}M")
+            elif tokens >= 1_000:
+                parts.append(f"{tokens / 1_000:.0f}K")
+            else:
+                parts.append(str(tokens))
+        if cost:
+            parts.append(f"${cost:.0f}")
+
+        self.title = f"🟢 {' '.join(parts)}" if parts else "🟢 已连接"
+
+    # ─── menu actions ────────────────────────────────────────────
 
     def _on_mode_trigger(self, _sender) -> None:
         self._set_mode("trigger")

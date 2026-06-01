@@ -118,6 +118,7 @@ async def on_statusline(req: web.Request, d: Daemon) -> web.Response:
         k: p.get(k)
         for k in ("session_id", "cost_usd", "context_pct", "rate_5h_pct",
                   "rate_7d_pct", "model_name", "project",
+                  "session_name", "worktree_name", "agent_name",
                   "input_tokens", "output_tokens",
                   "cache_read_tokens", "cache_create_tokens")
         if p.get(k) is not None
@@ -155,6 +156,7 @@ async def on_get_status(_req: web.Request, d: Daemon) -> web.Response:
             "approvals_total": d.state.approvals_total,
             "denials_total": d.state.denials_total,
             "statusline": d.state.statusline,
+            "daily": d.state.daily_totals(),
             "current_tool": d.state.current_tool,
             "voice": d.voice_status,
             "mode": d.mode,

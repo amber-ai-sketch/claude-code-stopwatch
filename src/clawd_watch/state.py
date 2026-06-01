@@ -23,7 +23,10 @@ class Session:
     context_pct: Optional[float] = None
     model_name: Optional[str] = None
     current_tool: Optional[str] = None
-    project: Optional[str] = None          # workspace dir basename, used as title
+    project: Optional[str] = None          # workspace dir basename, fallback title
+    session_name: Optional[str] = None     # user-set via --name or /rename, highest priority
+    worktree_name: Optional[str] = None    # git worktree name, second priority
+    agent_name: Optional[str] = None       # agent mode name, third priority
     input_tokens: Optional[int] = None
     output_tokens: Optional[int] = None
     cache_read_tokens: Optional[int] = None
@@ -162,6 +165,12 @@ class State:
                 s.model_name = payload["model_name"]
             if payload.get("project") is not None:
                 s.project = payload["project"]
+            if payload.get("session_name") is not None:
+                s.session_name = payload["session_name"]
+            if payload.get("worktree_name") is not None:
+                s.worktree_name = payload["worktree_name"]
+            if payload.get("agent_name") is not None:
+                s.agent_name = payload["agent_name"]
             if payload.get("input_tokens") is not None:
                 s.input_tokens = payload["input_tokens"]
             if payload.get("output_tokens") is not None:
@@ -181,6 +190,20 @@ class State:
             self.current_tool = tool
             self._tool_set_at = time.time()
             self.changed.set()
+
+    # ─── daily totals (sum across all tracked sessions) ──────────
+
+    def daily_totals(self) -> dict:
+        cost = 0.0
+        tokens = 0
+        for s in self.sessions.values():
+            if s.cost_usd is not None:
+                cost += s.cost_usd
+            for t in (s.input_tokens, s.output_tokens,
+                      s.cache_read_tokens, s.cache_create_tokens):
+                if t is not None:
+                    tokens += t
+        return {"cost_usd": round(cost, 2), "tokens": tokens}
 
     # ─── aggregate view for heartbeats ─────────────────────────
 
@@ -206,6 +229,10 @@ class State:
                 "run": 1 if s.running else 0,
                 "wait": 1 if s.session_id in waiting_sids else 0,
             }
+            # Title priority: session_name > worktree_name > agent_name > project.
+            title = s.session_name or s.worktree_name or s.agent_name or s.project
+            if title:
+                d["title"] = title
             if s.context_pct is not None:
                 d["ctx"] = round(s.context_pct, 1)
             if s.cost_usd is not None:
@@ -214,8 +241,6 @@ class State:
                 d["model"] = s.model_name
             if s.current_tool:
                 d["tool"] = s.current_tool
-            if s.project:
-                d["proj"] = s.project
             if s.input_tokens is not None:
                 d["tin"] = s.input_tokens
             if s.output_tokens is not None:

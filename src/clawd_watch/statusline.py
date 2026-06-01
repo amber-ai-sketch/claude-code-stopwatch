@@ -72,11 +72,30 @@ def normalize(payload: dict) -> dict:
                 if isinstance(v, int):
                     out[dst] = v
 
+    # Session name — user-set via --name or /rename, highest priority title.
+    session_name = payload.get("session_name")
+    if isinstance(session_name, str) and session_name:
+        out["session_name"] = session_name
+
     workspace = payload.get("workspace")
     if isinstance(workspace, dict):
         cwd = workspace.get("current_dir")
         if isinstance(cwd, str) and cwd:
             out["project"] = os.path.basename(cwd.rstrip("/"))
+
+    # Worktree name — if running in a git worktree.
+    worktree = payload.get("worktree")
+    if isinstance(worktree, dict):
+        wt_name = worktree.get("name")
+        if isinstance(wt_name, str) and wt_name:
+            out["worktree_name"] = wt_name
+
+    # Agent name — if running with --agent flag.
+    agent = payload.get("agent")
+    if isinstance(agent, dict):
+        agent_name = agent.get("name")
+        if isinstance(agent_name, str) and agent_name:
+            out["agent_name"] = agent_name
 
     rl = payload.get("rate_limits")
     if isinstance(rl, dict):
