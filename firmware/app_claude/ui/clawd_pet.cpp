@@ -4,6 +4,7 @@
  */
 #include "clawd_pet.h"
 #include "design_tokens.h"
+#include <math.h>
 
 namespace clawd_watch {
 
@@ -131,26 +132,21 @@ void clawd_leg_tick(void* var, int32_t phase)
     static_cast<ClawdPet*>(var)->set_leg_phase(phase / 1000.0f);
 }
 
-void clawd_celebrate_tick(void* var, int32_t /*phase*/)
+// Spring-like path: overshoot + dampened oscillation within one cycle.
+// Each loop iteration re-derives from t=0, giving a lively bounce that
+// keeps going for the full 5s instead of settling after 1.5s.
+static int32_t celebrate_spring_path(const lv_anim_t* a)
 {
-    auto* pet = static_cast<ClawdPet*>(var);
-    float t = lv_tick_elaps(pet->_celebrate_start_tick) / 1000.0f;
-    pet->_celebrate_spring.next(t);
-    pet->apply_phase(pet->_celebrate_spring.value);
-    if (pet->_celebrate_spring.done) {
-        lv_anim_del(var, clawd_celebrate_tick);
-    }
+    float progress = (float)a->act_time / (float)a->duration;  // 0..1
+    float omega = 18.0f;        // angular frequency (~3 bounces per cycle)
+    float damping = 4.0f;       // decay rate within one cycle
+    float val = 1.0f - expf(-damping * progress) * cosf(omega * progress);
+    return (int32_t)(val * 1000.0f);  // 0..~1200 (overshoots past 1000)
 }
 
 void clawd_claw_bob_tick(void* var, int32_t phase)
 {
     static_cast<ClawdPet*>(var)->_claw_bob_phase = phase / 1000.0f;
-}
-
-void clawd_celebrate_ready(lv_anim_t* a)
-{
-    // Ensure we land exactly on the settled value.
-    static_cast<ClawdPet*>(a->var)->apply_phase(1.0f);
 }
 
 }  // namespace
@@ -202,23 +198,19 @@ void ClawdPet::set_state(ClawdState state)
 
     // Slow, eased oscillation. Durations are long on purpose — peace, not
     // urgency. waiting is the gentlest "hello", not an alarm.
-    // Celebrate uses spring physics for a lively bounce with overshoot.
+    // Celebrate uses a looping spring path for lively bounce throughout.
     if (state == ClawdState::Celebrate) {
-        _celebrate_spring.setSpringOptions(1500.0f, 0.7f, 0.3f);
-        _celebrate_spring.retarget(0.0f, 1.0f);
-        _celebrate_spring.init();
-        _celebrate_start_tick = lv_tick_get();
-
+        // Body bounce: looping spring path (overshoot + damped oscillation
+        // each 1.5s cycle). Keeps bouncing for the full 5s.
         lv_anim_t a;
         lv_anim_init(&a);
         lv_anim_set_var(&a, this);
-        lv_anim_set_exec_cb(&a, clawd_celebrate_tick);
+        lv_anim_set_exec_cb(&a, clawd_tick);
         lv_anim_set_values(&a, 0, 1000);
-        lv_anim_set_duration(&a, 5000);
-        lv_anim_set_path_cb(&a, lv_anim_path_linear);
+        lv_anim_set_duration(&a, 1500);
+        lv_anim_set_path_cb(&a, celebrate_spring_path);
         lv_anim_set_playback_duration(&a, 0);
-        lv_anim_set_repeat_count(&a, 1);
-        lv_anim_set_ready_cb(&a, clawd_celebrate_ready);
+        lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
         lv_anim_start(&a);
 
         // Energetic leg wiggle — stops before the body settles so the

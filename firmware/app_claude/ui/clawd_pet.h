@@ -18,7 +18,6 @@
  */
 #pragma once
 #include <lvgl.h>
-#include "core/animation/generators/spring/spring.hpp"
 
 namespace clawd_watch {
 
@@ -38,10 +37,8 @@ public:
     void apply_zzz_phase(float t);
     void set_leg_phase(float t);   // leg stepping callback (1.2s cycle)
 
-    // Celebrate spring state — public so the anon-namespace callback can drive it.
-    smooth_ui_toolkit::Spring _celebrate_spring;
-    uint32_t _celebrate_start_tick = 0;
-    float _claw_bob_phase = 0;  // 0..1, gentle claw oscillation after bounce
+    // Celebrate: claw bob phase (driven by its own lv_anim).
+    float _claw_bob_phase = 0;
 
 private:
     void _stop_anims();
