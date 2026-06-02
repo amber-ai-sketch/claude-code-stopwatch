@@ -216,16 +216,17 @@ void ClawdPet::set_state(ClawdState state)
         lv_anim_set_ready_cb(&a, clawd_celebrate_ready);
         lv_anim_start(&a);
 
-        // Energetic leg wiggle — keeps moving throughout the 2s celebrate.
+        // Energetic leg wiggle — stops before the body settles so the
+        // final pose has still legs (distinct from working state).
         _leg_phase = 0;
         lv_anim_init(&_legAnim);
         lv_anim_set_var(&_legAnim, this);
         lv_anim_set_exec_cb(&_legAnim, clawd_leg_tick);
         lv_anim_set_values(&_legAnim, 0, 1000);
-        lv_anim_set_duration(&_legAnim, 400);
+        lv_anim_set_duration(&_legAnim, 350);
         lv_anim_set_path_cb(&_legAnim, lv_anim_path_ease_in_out);
-        lv_anim_set_playback_duration(&_legAnim, 400);
-        lv_anim_set_repeat_count(&_legAnim, LV_ANIM_REPEAT_INFINITE);
+        lv_anim_set_playback_duration(&_legAnim, 350);
+        lv_anim_set_repeat_count(&_legAnim, 2);
         lv_anim_start(&_legAnim);
     } else {
         uint32_t dur = (state == ClawdState::Working) ? 1800
