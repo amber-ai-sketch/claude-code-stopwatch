@@ -188,16 +188,14 @@ void OverviewPage::update(int sessions_total, int sessions_running, int sessions
     if (sessions_waiting > 0) {
         snprintf(buf, sizeof(buf), "%d", sessions_waiting);
         lv_label_set_text(_count, buf);
-        lv_label_set_text(_count_sub,
-            sessions_waiting == 1 ? "needs you" : "need you");
     } else {
         snprintf(buf, sizeof(buf), "%d / %d", sessions_running, sessions_total);
         lv_label_set_text(_count, buf);
-        lv_label_set_text(_count_sub,
-            sessions_running > 0 ? "running"
-          : sessions_total > 0   ? "idle"
-                                 : "no sessions");
     }
+    // Only show subtitle when there's no session at all — the chip already
+    // shows the state ("working" / "idle" / "your turn") so a redundant
+    // "running" / "idle" adds noise.
+    lv_label_set_text(_count_sub, sessions_total > 0 ? "" : "no sessions");
 
     // Count text: dimmer when idle to match the muted pet.
     lv_color_t count_color = (state == ClawdState::Idle)
