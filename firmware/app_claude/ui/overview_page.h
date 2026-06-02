@@ -40,7 +40,6 @@ private:
     lv_obj_t* _chip       = nullptr;  // rounded status pill
     lv_obj_t* _chip_label = nullptr;
     lv_obj_t* _count      = nullptr;  // "2 / 3"
-    lv_obj_t* _count_sub  = nullptr;  // "running" / "idle" / ...
     std::unique_ptr<ClawdPet> _pet;
 
     // Battery gauge — thin bar near the top.

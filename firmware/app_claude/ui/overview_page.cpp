@@ -80,13 +80,7 @@ OverviewPage::OverviewPage(lv_obj_t* parent)
     lv_obj_set_style_text_font(_count, &lv_font_montserrat_44, 0);
     lv_obj_set_style_text_color(_count, lv_color_white(), 0);
     lv_label_set_text(_count, "0 / 0");
-    lv_obj_align(_count, LV_ALIGN_CENTER, 0, 118);
-
-    _count_sub = lv_label_create(parent);
-    lv_obj_set_style_text_font(_count_sub, &lv_font_montserrat_20, 0);
-    lv_obj_set_style_text_color(_count_sub, kGrey, 0);
-    lv_label_set_text(_count_sub, "no sessions");
-    lv_obj_align(_count_sub, LV_ALIGN_CENTER, 0, 166);
+    lv_obj_align(_count, LV_ALIGN_CENTER, 0, 136);
 
     update(0, 0, 0);
 }
@@ -131,7 +125,6 @@ void OverviewPage::update(int sessions_total, int sessions_running, int sessions
         lv_obj_set_style_text_color(_chip_label, kDimIdle, 0);
         lv_obj_set_style_bg_color(_chip, kChipBgIdle, 0);
         lv_label_set_text(_count, "—");
-        lv_label_set_text(_count_sub, "searching");
         if (_shown != ClawdState::Idle) {
             _pet->set_state(ClawdState::Idle);
             _shown = ClawdState::Idle;
@@ -182,7 +175,7 @@ void OverviewPage::update(int sessions_total, int sessions_running, int sessions
     lv_obj_set_style_text_color(_chip_label, chip_fg, 0);
     lv_obj_set_style_bg_color(_chip, chip_bg, 0);
 
-    // Count + subtitle. When waiting, show the waiting count prominently
+    // Count display. When waiting, show the waiting count prominently
     // so the user knows how many sessions need attention.
     char buf[24];
     if (sessions_waiting > 0) {
@@ -192,13 +185,9 @@ void OverviewPage::update(int sessions_total, int sessions_running, int sessions
         snprintf(buf, sizeof(buf), "%d / %d", sessions_running, sessions_total);
         lv_label_set_text(_count, buf);
     }
-    // Only show subtitle when there's no session at all — the chip already
-    // shows the state ("working" / "idle" / "your turn") so a redundant
-    // "running" / "idle" adds noise.
-    lv_label_set_text(_count_sub, sessions_total > 0 ? "" : "no sessions");
 
-    // Count text: dimmer when idle to match the muted pet.
-    lv_color_t count_color = (state == ClawdState::Idle)
+    // Count text: dimmer when idle or disconnected.
+    lv_color_t count_color = (state == ClawdState::Idle || !ble_connected)
         ? lv_color_make(0x66, 0x66, 0x66) : lv_color_white();
     lv_obj_set_style_text_color(_count, count_color, 0);
 
