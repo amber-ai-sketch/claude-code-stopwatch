@@ -52,8 +52,8 @@
   .wait .clawL{animation:helloWave 3s ease-in-out infinite;transform-origin:right bottom;}
   @keyframes helloWave{0%,100%{transform:rotate(-12deg) translateY(-8px);}50%{transform:rotate(-20deg) translateY(-12px);}}
 
-  /* ④ CELEBRATE: spring-driven bounce — overshoot, bounce back, settle.
-     One-shot (2s), then holds the rest pose. Mimics Spring(1000ms, 0.5 bounce). */
+  /* ④ CELEBRATE: spring-driven bounce + fast leg wiggle.
+     Bounce overshoots and settles; legs keep wiggling the full 2s. */
   .celeb .body{animation:celebBounce 2s cubic-bezier(.36,1.4,.5,.95) 1 forwards;transform-origin:center;}
   @keyframes celebBounce{
     0%{transform:translateY(0);}
@@ -74,13 +74,10 @@
     80%{transform:translateY(-3px);}
     100%{transform:translateY(0);}
   }
-  .celeb .legL,.celeb .legR{animation:celebLegs 2s cubic-bezier(.36,1.4,.5,.95) 1 forwards;transform-origin:center bottom;}
-  @keyframes celebLegs{
-    0%{transform:translateY(0);}
-    18%{transform:translateY(4px);}
-    52%{transform:translateY(2px);}
-    100%{transform:translateY(0);}
-  }
+  .celeb .legL{animation:celebStepA .4s ease-in-out infinite;transform-origin:center bottom;}
+  .celeb .legR{animation:celebStepB .4s ease-in-out infinite;transform-origin:center bottom;}
+  @keyframes celebStepA{0%,100%{transform:translateY(0);}50%{transform:translateY(3px);}}
+  @keyframes celebStepB{0%,100%{transform:translateY(3px);}50%{transform:translateY(0);}}
 </style>
 </head>
 <body>
