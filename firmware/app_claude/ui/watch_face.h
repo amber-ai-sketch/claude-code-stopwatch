@@ -15,7 +15,9 @@
  */
 #pragma once
 #include <lvgl.h>
+#include <map>
 #include <memory>
+#include <string>
 #include <vector>
 #include "../ble/watch_state.h"
 #include "overview_page.h"
@@ -70,7 +72,13 @@ private:
 
     int _session_page_count = -1;           // -1 = not built yet
     int _current_page_idx = 0;              // 0 = overview, 1..N = sessions
-    int _prev_running = 0;                  // for celebration detection
+
+    // Per-session celebrate detection: track which sessions were running
+    // last heartbeat so we can detect individual Working→Idle transitions.
+    std::map<std::string, bool> _prev_session_running;
+    bool     _celebrate_active = false;
+    uint32_t _celebrate_start_ms = 0;
+    static constexpr uint32_t kCelebrateMs = 2000;
 
     // Voice transcript overlay — shows dictated text briefly after recording.
     lv_obj_t* _transcript_panel = nullptr;

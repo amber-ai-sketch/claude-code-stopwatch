@@ -131,6 +131,23 @@ void clawd_leg_tick(void* var, int32_t phase)
     static_cast<ClawdPet*>(var)->set_leg_phase(phase / 1000.0f);
 }
 
+void clawd_celebrate_tick(void* var, int32_t /*phase*/)
+{
+    auto* pet = static_cast<ClawdPet*>(var);
+    float t = lv_tick_elaps(pet->_celebrate_start_tick) / 1000.0f;
+    pet->_celebrate_spring.next(t);
+    pet->apply_phase(pet->_celebrate_spring.value);
+    if (pet->_celebrate_spring.done) {
+        lv_anim_del(var, clawd_celebrate_tick);
+    }
+}
+
+void clawd_celebrate_ready(lv_anim_t* a)
+{
+    // Ensure we land exactly on the settled value.
+    static_cast<ClawdPet*>(a->var)->apply_phase(1.0f);
+}
+
 }  // namespace
 
 void ClawdPet::set_state(ClawdState state)
@@ -180,28 +197,39 @@ void ClawdPet::set_state(ClawdState state)
 
     // Slow, eased oscillation. Durations are long on purpose — peace, not
     // urgency. waiting is the gentlest "hello", not an alarm.
-    // Celebrate is a quick one-shot bounce (no repeat).
-    uint32_t dur = (state == ClawdState::Working)   ? 1800
-                 : (state == ClawdState::Idle)      ? 4000
-                 : (state == ClawdState::Celebrate)  ? 600
-                                                     : 1500;  // waiting
-
-    lv_anim_t a;
-    lv_anim_init(&a);
-    lv_anim_set_var(&a, this);
-    lv_anim_set_exec_cb(&a, clawd_tick);
-    lv_anim_set_values(&a, 0, 1000);
-    lv_anim_set_duration(&a, dur);
-    lv_anim_set_path_cb(&a, lv_anim_path_ease_in_out);
+    // Celebrate uses spring physics for a lively bounce with overshoot.
     if (state == ClawdState::Celebrate) {
-        // One-shot bounce: play forward then back, then stop.
-        lv_anim_set_playback_duration(&a, dur);
+        _celebrate_spring.setSpringOptions(1000.0f, 0.5f, 0.3f);
+        _celebrate_spring.retarget(0.0f, 1.0f);
+        _celebrate_spring.init();
+        _celebrate_start_tick = lv_tick_get();
+
+        lv_anim_t a;
+        lv_anim_init(&a);
+        lv_anim_set_var(&a, this);
+        lv_anim_set_exec_cb(&a, clawd_celebrate_tick);
+        lv_anim_set_values(&a, 0, 1000);
+        lv_anim_set_duration(&a, 2000);
+        lv_anim_set_path_cb(&a, lv_anim_path_linear);
+        lv_anim_set_playback_duration(&a, 0);
         lv_anim_set_repeat_count(&a, 1);
+        lv_anim_set_ready_cb(&a, clawd_celebrate_ready);
+        lv_anim_start(&a);
     } else {
+        uint32_t dur = (state == ClawdState::Working) ? 1800
+                     : (state == ClawdState::Idle)    ? 4000
+                                                      : 1500;  // waiting
+        lv_anim_t a;
+        lv_anim_init(&a);
+        lv_anim_set_var(&a, this);
+        lv_anim_set_exec_cb(&a, clawd_tick);
+        lv_anim_set_values(&a, 0, 1000);
+        lv_anim_set_duration(&a, dur);
+        lv_anim_set_path_cb(&a, lv_anim_path_ease_in_out);
         lv_anim_set_playback_duration(&a, dur);
         lv_anim_set_repeat_count(&a, LV_ANIM_REPEAT_INFINITE);
+        lv_anim_start(&a);
     }
-    lv_anim_start(&a);
 
     // Idle breathing: scaleY on _char with pivot at body CENTER (symmetric squash).
     if (state == ClawdState::Idle) {
@@ -236,17 +264,13 @@ void ClawdPet::set_state(ClawdState state)
         lv_anim_start(&_zzzAnim);
     }
 
-    // Waiting: _char leans -2°, left claw waves -12° to -20°.
+    // Waiting: set pivots; apply_phase() drives the actual rotation values.
     if (state == ClawdState::Waiting) {
-        // Body lean: pivot at character center-bottom.
         lv_obj_set_style_transform_pivot_x(_char, kBodyX + kBodyW / 2, 0);
         lv_obj_set_style_transform_pivot_y(_char, kBodyY + kBodyH, 0);
-        lv_obj_set_style_transform_rotation(_char, -20, 0);  // -2° in LVGL
-
-        // Claw wave: pivot at claw bottom-right (attachment point to body).
+        // Claw wave pivots at bottom-right corner (attachment to body).
         lv_obj_set_style_transform_pivot_x(_clawL, kClawW, 0);
         lv_obj_set_style_transform_pivot_y(_clawL, kClawW, 0);
-        lv_obj_set_style_transform_rotation(_clawL, -120, 0);  // -12° start
     }
 }
 
@@ -254,8 +278,8 @@ void ClawdPet::apply_phase(float t)
 {
     switch (_state) {
     case ClawdState::Working: {
-        // Body bobs -5px (1.8s cycle). Legs use their own 1.2s cycle.
-        int bob = (int)(-5.0f * t);
+        // Body bobs -4px (1.8s cycle). Legs use their own 1.2s cycle.
+        int bob = (int)(-4.0f * t);
         lv_obj_set_y(_body, kBodyY + bob);
         lv_obj_set_y(_eyeL, kEyeY + bob);
         lv_obj_set_y(_eyeR, kEyeY + bob);
@@ -265,26 +289,19 @@ void ClawdPet::apply_phase(float t)
         break;
     }
     case ClawdState::Idle: {
-        // Breathing squash: scaleY on _char, pivot at body center.
-        // CSS design: scaleY(0.95) + translateY(3px), transform-origin center.
-        // The scaleY compresses symmetrically; body_y shifts down to match
-        // the CSS translateY, keeping the visual top roughly in place.
-        int squash = (int)(5.0f * t);
-        lv_obj_set_style_transform_scale_y(_char, 256 - squash * 6, 0);
-        lv_obj_set_y(_char, squash / 2);  // settle down as body compresses
+        // Breathing squash: scaleY(1.0→0.95) on _char, pivot at body center.
+        // translateY(0→+2px) settles the body down as it compresses.
+        lv_obj_set_style_transform_scale_y(_char, 256 - (int)(13.0f * t), 0);
+        lv_obj_set_y(_char, (int)(2.0f * t));
         break;
     }
     case ClawdState::Waiting: {
-        // Body lifts -4px and leans -2°. Left claw waves -12° to -20°.
-        int lift = (int)(-4.0f * t);
-        lv_obj_set_y(_body, kBodyY + lift);
-        lv_obj_set_y(_eyeL, kEyeY + lift);
-        lv_obj_set_y(_eyeR, kEyeY + lift);
-        lv_obj_set_y(_clawR, kClawY + lift);
-        lv_obj_set_y(_clawL, kClawYRaised + lift + (int)(-4.0f * t));
-        int claw_rot = -120 + (int)(-80.0f * t);  // -12° to -20°
-        lv_obj_set_style_transform_rotation(_clawL, claw_rot, 0);
-        for (int i = 0; i < 4; i++) lv_obj_set_y(_legs[i], kLegY);
+        // _char leanIn: translateY(0→-3px), rotate(0→-2°). Moves all parts.
+        lv_obj_set_y(_char, (int)(-3.0f * t));
+        lv_obj_set_style_transform_rotation(_char, (int)(-20.0f * t), 0);
+        // clawL helloWave: y from kClawYRaised-6 to kClawYRaised-10, rot -12°→-20°
+        lv_obj_set_y(_clawL, kClawYRaised - 6 - (int)(4.0f * t));
+        lv_obj_set_style_transform_rotation(_clawL, -120 + (int)(-80.0f * t), 0);
         break;
     }
     case ClawdState::Celebrate: {
@@ -305,11 +322,11 @@ void ClawdPet::apply_phase(float t)
 void ClawdPet::_apply_legs_phase(float t)
 {
     // Soft alternating step: pairs (0,2) and (1,3) move counter-phase.
-    int step = (int)(3.0f * t);
+    int step = (int)(2.0f * t);
     lv_obj_set_y(_legs[0], kLegY + step);
     lv_obj_set_y(_legs[2], kLegY + step);
-    lv_obj_set_y(_legs[1], kLegY + 3 - step);
-    lv_obj_set_y(_legs[3], kLegY + 3 - step);
+    lv_obj_set_y(_legs[1], kLegY + 2 - step);
+    lv_obj_set_y(_legs[3], kLegY + 2 - step);
 }
 
 void ClawdPet::set_leg_phase(float t)

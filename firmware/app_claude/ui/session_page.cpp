@@ -23,14 +23,6 @@ constexpr int kRow1Dy  = -14;  // value center offset from screen center
 constexpr int kRow2Dy  =  66;
 constexpr int kCapGap  = 26;   // caption below its value
 
-// "15500" → "15.5k", "82000" → "82k", "950" → "950". Keeps the grid tidy.
-void fmt_tokens(char* buf, size_t n, int32_t v)
-{
-    if (v < 0)            snprintf(buf, n, "—");
-    else if (v < 1000)    snprintf(buf, n, "%d", (int)v);
-    else if (v < 10000)   snprintf(buf, n, "%.1fk", v / 1000.0f);
-    else                  snprintf(buf, n, "%dk", (int)(v / 1000.0f + 0.5f));
-}
 
 }  // namespace
 
@@ -44,7 +36,7 @@ SessionPage::SessionPage(lv_obj_t* parent)
     // run clockwise from 3 o'clock; bottom is 90°. A gap of 110° spans
     // 35°→145°, so the track is the 250° arc from 145° round to 35°.
     _ring = lv_arc_create(parent);
-    lv_obj_set_size(_ring, 450, 450);
+    lv_obj_set_size(_ring, 464, 464);
     lv_obj_center(_ring);
     lv_arc_set_bg_angles(_ring, 145, 360 + 35);   // 145° → 395° (=35°), 250° track
     lv_arc_set_range(_ring, 0, 100);
@@ -88,16 +80,18 @@ SessionPage::SessionPage(lv_obj_t* parent)
     lv_label_set_text(_chip_label, "idle");
     lv_obj_center(_chip_label);
 
-    // Token 2×2 grid: value (white, 24) over a static caption (dim, 14).
+    // Token 2×2 grid: animated NumberFlow value over a static caption.
     for (int i = 0; i < 4; i++) {
         int dx = (i % 2 == 0) ? -kColDx : kColDx;
         int vy = (i < 2) ? kRow1Dy : kRow2Dy;
 
-        _tok_val[i] = lv_label_create(parent);
-        lv_obj_set_style_text_font(_tok_val[i], &lv_font_montserrat_24, 0);
-        lv_obj_set_style_text_color(_tok_val[i], lv_color_white(), 0);
-        lv_label_set_text(_tok_val[i], "—");
-        lv_obj_align(_tok_val[i], LV_ALIGN_CENTER, dx, vy);
+        _tok_val[i] = new NumberFlow(parent);
+        lv_obj_set_style_text_font(_tok_val[i]->raw_ptr(), &lv_font_montserrat_24, 0);
+        _tok_val[i]->setTextColor(lv_color_white());
+        lv_obj_remove_flag(_tok_val[i]->raw_ptr(), LV_OBJ_FLAG_CLICKABLE);
+        _tok_val[i]->init();
+        _tok_val[i]->setValue(0);
+        lv_obj_align(_tok_val[i]->raw_ptr(), LV_ALIGN_CENTER, dx, vy);
 
         lv_obj_t* cap = lv_label_create(parent);
         lv_obj_set_style_text_font(cap, &lv_font_montserrat_14, 0);
@@ -106,12 +100,27 @@ SessionPage::SessionPage(lv_obj_t* parent)
         lv_obj_align(cap, LV_ALIGN_CENTER, dx, vy + kCapGap);
     }
 
-    // Footer: "$cost · tool", in the ring's bottom gap.
-    _footer = lv_label_create(parent);
-    lv_obj_set_style_text_font(_footer, &lv_font_montserrat_16, 0);
-    lv_obj_set_style_text_color(_footer, kGrey, 0);
-    lv_label_set_text(_footer, "");
-    lv_obj_align(_footer, LV_ALIGN_BOTTOM_MID, 0, -80);
+    // Cost: animated "$X.XX" via NumberFlowFloat.
+    // Stacked from bottom up: pager(y=36) → model → tool → cost, all
+    // inside the ring's 110° bottom gap.
+    _cost_flow = new NumberFlowFloat(parent);
+    lv_obj_set_style_text_font(_cost_flow->raw_ptr(), &lv_font_montserrat_16, 0);
+    _cost_flow->setDigitColor(lv_color_white());
+    _cost_flow->setPrefixColor(kGrey);
+    lv_obj_remove_flag(_cost_flow->raw_ptr(), LV_OBJ_FLAG_CLICKABLE);
+    _cost_flow->setPrefix("$");
+    _cost_flow->init();
+    lv_obj_align(_cost_flow->raw_ptr(), LV_ALIGN_BOTTOM_MID, 0, -88);
+
+    // Tool name: static label below the cost.
+    _tool_label = lv_label_create(parent);
+    lv_obj_set_style_text_font(_tool_label, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(_tool_label, kDim, 0);
+    lv_label_set_text(_tool_label, "");
+    lv_obj_align(_tool_label, LV_ALIGN_BOTTOM_MID, 0, -72);
+
+    // Model label: between tool name and pager dots (pager at y=36).
+    lv_obj_align(_model, LV_ALIGN_BOTTOM_MID, 0, -56);
 }
 
 void SessionPage::update(int ordinal, int count,
@@ -129,7 +138,6 @@ void SessionPage::update(int ordinal, int count,
 {
     (void)ordinal;
     (void)count;
-    char buf[64];
 
     // Display title priority: title (session_name/worktree/agent) > project > "session".
     const char* display_title = !title.empty() ? title.c_str()
@@ -167,26 +175,43 @@ void SessionPage::update(int ordinal, int count,
         lv_obj_set_style_arc_color(_ring, kArcUnknown, LV_PART_INDICATOR);
     }
 
-    // Token grid.
+    // Token grid — NumberFlow with k-scaling for large values.
     const int32_t toks[4] = {input_tokens, output_tokens,
                              cache_read_tokens, cache_create_tokens};
     for (int i = 0; i < 4; i++) {
-        fmt_tokens(buf, sizeof(buf), toks[i]);
-        lv_label_set_text(_tok_val[i], buf);
+        int32_t scaled;
+        const char* suffix;
+        if (toks[i] < 0) {
+            scaled = 0; suffix = "";
+        } else if (toks[i] < 1000) {
+            scaled = toks[i]; suffix = "";
+        } else {
+            scaled = (toks[i] + 500) / 1000; suffix = "k";
+        }
+        _tok_val[i]->setValue(scaled);
+        if (_last_tok_scaled[i] != scaled) {
+            _tok_val[i]->setSuffix(suffix);
+            _last_tok_scaled[i] = scaled;
+        }
+        _tok_val[i]->update();
     }
 
-    // Footer: "$cost · tool", dropping whichever is unknown/empty.
-    char cost_part[24] = {0};
-    if (cost_usd >= 0.0f) snprintf(cost_part, sizeof(cost_part), "$%.2f", cost_usd);
-    if (cost_part[0] && !tool.empty())
-        snprintf(buf, sizeof(buf), "%s · %s", cost_part, tool.c_str());
-    else if (cost_part[0])
-        snprintf(buf, sizeof(buf), "%s", cost_part);
-    else if (!tool.empty())
-        snprintf(buf, sizeof(buf), "%s", tool.c_str());
-    else
-        buf[0] = '\0';
-    lv_label_set_text(_footer, buf);
+    // Cost — NumberFlowFloat for the animated dollar amount.
+    if (cost_usd >= 0.0f) {
+        _cost_flow->setValue(cost_usd);
+        lv_obj_clear_flag(_cost_flow->raw_ptr(), LV_OBJ_FLAG_HIDDEN);
+    } else {
+        lv_obj_add_flag(_cost_flow->raw_ptr(), LV_OBJ_FLAG_HIDDEN);
+    }
+    _cost_flow->update();
+
+    // Tool name (static label).
+    if (!tool.empty()) {
+        lv_label_set_text(_tool_label, tool.c_str());
+        lv_obj_clear_flag(_tool_label, LV_OBJ_FLAG_HIDDEN);
+    } else if (cost_usd < 0.0f) {
+        lv_obj_add_flag(_tool_label, LV_OBJ_FLAG_HIDDEN);
+    }
 }
 
 }  // namespace clawd_watch

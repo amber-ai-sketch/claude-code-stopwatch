@@ -8,20 +8,8 @@ namespace clawd_watch {
 
 ButtonEvent ButtonFsm::update(bool pressed, uint32_t now_ms)
 {
-    // Debounce: ignore level transitions that come faster than kDebounceMs
-    // after the previous one. This handles contact bounce on press AND on
-    // release without a separate timer. The very first transition always
-    // passes — debounce only kicks in on subsequent edges.
-    if (pressed != _last_pressed) {
-        if (_saw_transition && now_ms - _last_change_ms < kDebounceMs) {
-            // Treat as bounce — keep last_pressed unchanged.
-            pressed = _last_pressed;
-        } else {
-            _saw_transition = true;
-            _last_change_ms = now_ms;
-            _last_pressed   = pressed;
-        }
-    }
+    // No debounce here — Button_Class (HAL) already debounces at 10ms
+    // before we see the level. Adding a second debounce would double-filter.
 
     switch (_state) {
         case S::Idle:

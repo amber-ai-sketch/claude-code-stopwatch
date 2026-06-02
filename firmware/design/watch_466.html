@@ -171,15 +171,16 @@ function tokenGrid(parent, cy, items){
 // ───── session 页 ─────
 (function(){
   const w=document.getElementById('se');
-  ringArc(w,450,14,70,ORANGE,110);
+  ringArc(w,462,14,70,ORANGE,110);
   el(w,{align:'top',dy:84,font:22,color:WHITE,text:'claude-code-stopwatch'});
   el(w,{align:'top',dy:120,font:16,chip:1,chipBg:chipBgWorking,color:ORANGE,text:'working'});
   tokenGrid(w,242,[
     ['INPUT','15.5k'],['OUTPUT','1.2k'],
     ['CACHE HIT','82k'],['CACHE WRITE','5.0k'],
   ]);
-  el(w,{align:'bottom',dy:52,font:14,color:GREY,text:'sonnet-4.5'});
-  el(w,{align:'bottom',dy:72,font:18,color:GREY,text:'$12.34 · Bash'});
+  el(w,{align:'bottom',dy:44,font:14,color:GREY,text:'sonnet-4.5'});
+  el(w,{align:'bottom',dy:58,font:14,color:'#7a7a7a',text:'Bash'});
+  el(w,{align:'bottom',dy:74,font:16,color:WHITE,text:'$12.34'});
   pager(w,4,1,30);
 })();
 

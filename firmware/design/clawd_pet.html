@@ -37,8 +37,6 @@
   .work .legR{animation:stepB 1.2s ease-in-out infinite;transform-origin:center bottom;}
   @keyframes stepA{0%,100%{transform:translateY(0);}50%{transform:translateY(3px);}}
   @keyframes stepB{0%,100%{transform:translateY(3px);}50%{transform:translateY(0);}}
-  .work-ring{animation:auraPulse 3.2s ease-in-out infinite;}
-  @keyframes auraPulse{0%,100%{opacity:.55;}50%{opacity:.9;}}
 
   /* ② IDLE: at rest — slow breathe, sleepy eyes, zzz drift. */
   .idle .body{animation:breathe 4s ease-in-out infinite;transform-origin:center;}
@@ -53,7 +51,6 @@
   @keyframes leanIn{0%,100%{transform:translateY(0) rotate(0);}50%{transform:translateY(-4px) rotate(-2deg);}}
   .wait .clawL{animation:helloWave 3s ease-in-out infinite;transform-origin:right bottom;}
   @keyframes helloWave{0%,100%{transform:rotate(-12deg) translateY(-8px);}50%{transform:rotate(-20deg) translateY(-12px);}}
-  .wait-ring{animation:auraPulse 3s ease-in-out infinite;}
 </style>
 </head>
 <body>
@@ -70,8 +67,6 @@
     <div class="watch work">
       <svg viewBox="0 0 380 380">
         <circle cx="190" cy="190" r="168" fill="none" stroke="#1a1410" stroke-width="8"/>
-        <circle class="work-ring" cx="190" cy="190" r="168" fill="none" stroke="#D97757" stroke-width="8"
-                stroke-linecap="round" stroke-dasharray="800 1056" transform="rotate(-90 190 190)"/>
         <g class="body" fill="#D97757">
           <rect class="clawL" x="110" y="132" width="18" height="18"/>
           <rect class="clawR" x="252" y="132" width="18" height="18"/>
@@ -125,8 +120,6 @@
     <div class="watch wait">
       <svg viewBox="0 0 380 380">
         <circle cx="190" cy="190" r="168" fill="none" stroke="#1a1410" stroke-width="8"/>
-        <circle class="wait-ring" cx="190" cy="190" r="168" fill="none" stroke="#D97757" stroke-width="8"
-                stroke-linecap="round" stroke-dasharray="800 1056" transform="rotate(-90 190 190)"/>
         <g class="body" fill="#D97757">
           <!-- one claw raised in a calm hello -->
           <rect class="clawL" x="108" y="118" width="18" height="18"/>

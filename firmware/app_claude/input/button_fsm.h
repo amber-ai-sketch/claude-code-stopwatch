@@ -19,9 +19,8 @@
  *   LONG_HELD → (release) → IDLE
  *   CONSUMED_DOUBLE → (release) → IDLE
  *
- * Debounce: a 30ms hold-down cooldown prevents bouncing edges from
- * registering as rapid sequences. Implemented as a "minimum time between
- * sampled level changes" filter, not a software debounce timer.
+ * Debounce: handled upstream by Button_Class (HAL, 10ms). This FSM only
+ * does semantic classification (single/double/long), not electrical debounce.
  *
  * Single-press latency: 300ms (we have to wait the double-click window).
  * Long-press fires the moment the 500ms threshold crosses, so users feel
@@ -62,16 +61,12 @@ private:
         ConsumedDouble,  // emitted Double, second press still held — wait for release
     };
 
-    static constexpr uint32_t kDebounceMs   = 30;
     static constexpr uint32_t kSingleMaxMs  = 200;  // press shorter than this is candidate Single
     static constexpr uint32_t kDoubleMaxMs  = 300;  // gap between presses to count as Double
     static constexpr uint32_t kLongMs       = 500;
 
     const char* _name;
     S        _state           = S::Idle;
-    bool     _last_pressed    = false;
-    bool     _saw_transition  = false;  // gate debounce filter on first edge
-    uint32_t _last_change_ms  = 0;
     uint32_t _press_start_ms  = 0;
     uint32_t _release_ms      = 0;
 };

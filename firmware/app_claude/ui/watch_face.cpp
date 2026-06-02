@@ -386,27 +386,60 @@ void WatchFace::apply(const WatchState& state, bool ble_connected)
     int running = state.sessions_running;
     int waiting = state.sessions_waiting;
 
-    // Celebration: when running drops from >0 to 0 and nothing is waiting,
-    // briefly show a happy bounce before settling into idle.
-    if (_prev_running > 0 && running == 0 && waiting == 0) {
-        _overview->update(total, 0, 0, ClawdState::Celebrate, ble_connected,
-                          state.battery_pct, state.battery_charging);
+    // Copy the vector once — used for both transition detection and page updates.
+    auto sessions_copy = state.session_details;
+
+    // ── Per-session celebrate detection ──
+    // Trigger celebrate when any session transitions from running to not-running.
+    if (!_celebrate_active) {
+        for (const auto& s : sessions_copy) {
+            bool was_running = _prev_session_running[s.sid];
+            if (was_running && !s.running) {
+                _celebrate_active = true;
+                _celebrate_start_ms = lv_tick_get();
+                break;
+            }
+        }
+    }
+
+    // Update per-session running map for next heartbeat.
+    _prev_session_running.clear();
+    for (const auto& s : sessions_copy) {
+        _prev_session_running[s.sid] = s.running;
+    }
+
+    // ── Celebrate lifecycle ──
+    // Show celebrate animation, then transition back when it settles.
+    if (_celebrate_active) {
+        bool elapsed = lv_tick_elaps(_celebrate_start_ms) >= kCelebrateMs;
+        if (elapsed) {
+            // Done celebrating — transition to the current state.
+            _celebrate_active = false;
+            ClawdState next = (running > 0) ? ClawdState::Working : ClawdState::Idle;
+            _overview->update(total, running, waiting, next, ble_connected,
+                              state.battery_pct, state.battery_charging);
+        } else {
+            // Still celebrating — keep the bounce going.
+            _overview->update(total, running, waiting, ClawdState::Celebrate, ble_connected,
+                              state.battery_pct, state.battery_charging);
+        }
     } else {
         _overview->update(total, running, waiting, std::nullopt, ble_connected,
                           state.battery_pct, state.battery_charging);
     }
-    _prev_running = running;
 
-    // Update existing session pages FIRST — before checking whether to
-    // rebuild.  The BLE callback thread does clear()+push_back() on
-    // session_details without a lock; if we read between those two ops
-    // the size is momentarily 0.  By updating first we guarantee the
-    // visible page always has fresh data, and the guard below prevents
-    // a spurious teardown when n==0 but we already have pages.
-    int n = (int)state.session_details.size();
+    // Use the scalar `total` from the heartbeat for page count — it's
+    // written atomically by the BLE thread.  The `session_details` vector
+    // is not thread-safe (clear+push_back race can yield a half-built
+    // vector whose size momentarily disagrees with `total`).
+    int n = state.sessions_total;
+    if (n < 0) n = 0;
     int update_count = n < (int)_sessions.size() ? n : (int)_sessions.size();
+    // Also clamp to what we actually have data for.
+    if (update_count > (int)sessions_copy.size())
+        update_count = (int)sessions_copy.size();
     for (int i = 0; i < update_count; i++) {
-        const SessionInfo& s = state.session_details[i];
+        const SessionInfo& s = sessions_copy[i];
         ClawdState st = s.waiting ? ClawdState::Waiting
                       : s.running ? ClawdState::Working
                                   : ClawdState::Idle;
@@ -424,9 +457,8 @@ void WatchFace::apply(const WatchState& state, bool ble_connected)
             s.cache_create_tokens);
     }
 
-    // (Re)build session pages only when the count genuinely changed.
-    // Ignore n==0 when we already have pages — that's the BLE thread
-    // race (clear before push_back), not an actual session teardown.
+    // Rebuild pages when the total count changes.  Guard against the
+    // BLE race where total briefly becomes 0 during a reconnect.
     if (n != _session_page_count && !(n == 0 && _session_page_count > 0)) {
         _rebuild_session_pages(n);
     }

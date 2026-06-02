@@ -13,9 +13,10 @@
  *   claude-code-stopwatch   (project title, hero)
  *   sonnet-4.5              (model, grey)
  *   [chip]                  (working / idle / your turn)
- *   15.5k INPUT   1.2k OUTPUT
- *   82k CACHE HIT 5.0k CACHE WRITE
- *   $cost · tool            (footer, in the ring's bottom gap)
+ *   15.5k INPUT   1.2k OUTPUT      (NumberFlow, spring-animated digits)
+ *   82k CACHE HIT 5.0k CACHE WRITE (NumberFlow, spring-animated digits)
+ *   $cost               (NumberFlowFloat, spring-animated)
+ *   tool                (static label)
  *
  * The arc ring shows context % silently; there is no numeric "70%".
  * The pager dots (in WatchFace) show which session this is; there is no
@@ -25,6 +26,8 @@
  */
 #pragma once
 #include <lvgl.h>
+#include "number_flow/number_flow.hpp"
+#include "number_flow/number_flow_float.hpp"
 #include <string>
 #include "clawd_pet.h"  // for ClawdState
 
@@ -53,13 +56,18 @@ public:
                 int32_t cache_create_tokens);
 
 private:
+    using NumberFlow     = smooth_ui_toolkit::lvgl_cpp::NumberFlow;
+    using NumberFlowFloat = smooth_ui_toolkit::lvgl_cpp::NumberFlowFloat;
+
     lv_obj_t* _ring        = nullptr;  // context fill ring (bottom-gapped)
     lv_obj_t* _title       = nullptr;  // project name
     lv_obj_t* _model       = nullptr;
     lv_obj_t* _chip        = nullptr;
     lv_obj_t* _chip_label  = nullptr;
-    lv_obj_t* _tok_val[4]  = {};       // INPUT / OUTPUT / CACHE HIT / CACHE WRITE
-    lv_obj_t* _footer      = nullptr;  // "$cost · tool"
+    NumberFlow* _tok_val[4] = {};      // INPUT / OUTPUT / CACHE HIT / CACHE WRITE (animated)
+    NumberFlowFloat* _cost_flow = nullptr;  // "$cost" (animated)
+    lv_obj_t* _tool_label  = nullptr;  // "tool" name (static)
+    int32_t _last_tok_scaled[4] = {-1, -1, -1, -1};  // track suffix changes
 };
 
 }  // namespace clawd_watch
