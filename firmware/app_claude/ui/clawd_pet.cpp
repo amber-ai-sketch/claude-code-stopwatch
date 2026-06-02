@@ -142,6 +142,11 @@ void clawd_celebrate_tick(void* var, int32_t /*phase*/)
     }
 }
 
+void clawd_claw_bob_tick(void* var, int32_t phase)
+{
+    static_cast<ClawdPet*>(var)->_claw_bob_phase = phase / 1000.0f;
+}
+
 void clawd_celebrate_ready(lv_anim_t* a)
 {
     // Ensure we land exactly on the settled value.
@@ -199,7 +204,7 @@ void ClawdPet::set_state(ClawdState state)
     // urgency. waiting is the gentlest "hello", not an alarm.
     // Celebrate uses spring physics for a lively bounce with overshoot.
     if (state == ClawdState::Celebrate) {
-        _celebrate_spring.setSpringOptions(1000.0f, 0.5f, 0.3f);
+        _celebrate_spring.setSpringOptions(1500.0f, 0.7f, 0.3f);
         _celebrate_spring.retarget(0.0f, 1.0f);
         _celebrate_spring.init();
         _celebrate_start_tick = lv_tick_get();
@@ -228,6 +233,18 @@ void ClawdPet::set_state(ClawdState state)
         lv_anim_set_playback_duration(&_legAnim, 350);
         lv_anim_set_repeat_count(&_legAnim, 5);
         lv_anim_start(&_legAnim);
+
+        // Claw gentle bob — runs the full 5s, continues after bounce settles.
+        _claw_bob_phase = 0;
+        lv_anim_init(&_clawBobAnim);
+        lv_anim_set_var(&_clawBobAnim, this);
+        lv_anim_set_exec_cb(&_clawBobAnim, clawd_claw_bob_tick);
+        lv_anim_set_values(&_clawBobAnim, 0, 1000);
+        lv_anim_set_duration(&_clawBobAnim, 800);
+        lv_anim_set_path_cb(&_clawBobAnim, lv_anim_path_ease_in_out);
+        lv_anim_set_playback_duration(&_clawBobAnim, 800);
+        lv_anim_set_repeat_count(&_clawBobAnim, LV_ANIM_REPEAT_INFINITE);
+        lv_anim_start(&_clawBobAnim);
     } else {
         uint32_t dur = (state == ClawdState::Working) ? 1800
                      : (state == ClawdState::Idle)    ? 4000
@@ -320,11 +337,13 @@ void ClawdPet::apply_phase(float t)
     case ClawdState::Celebrate: {
         // Happy bounce: body jumps -12px, claws up, legs tuck.
         int jump = (int)(-12.0f * t);
+        // Claw bob: gentle -3px oscillation overlaid after spring settles.
+        int bob = (int)(-3.0f * _claw_bob_phase);
         lv_obj_set_y(_body, kBodyY + jump);
         lv_obj_set_y(_eyeL, kEyeY + jump);
         lv_obj_set_y(_eyeR, kEyeY + jump);
-        lv_obj_set_y(_clawL, kClawYRaised + jump);
-        lv_obj_set_y(_clawR, kClawYRaised + jump);
+        lv_obj_set_y(_clawL, kClawYRaised + jump + bob);
+        lv_obj_set_y(_clawR, kClawYRaised + jump + bob);
         for (int i = 0; i < 4; i++)
             lv_obj_set_y(_legs[i], kLegY + (int)(3.0f * t));
         break;

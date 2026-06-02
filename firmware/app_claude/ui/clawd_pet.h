@@ -41,6 +41,7 @@ public:
     // Celebrate spring state — public so the anon-namespace callback can drive it.
     smooth_ui_toolkit::Spring _celebrate_spring;
     uint32_t _celebrate_start_tick = 0;
+    float _claw_bob_phase = 0;  // 0..1, gentle claw oscillation after bounce
 
 private:
     void _stop_anims();
@@ -63,6 +64,7 @@ private:
 
     float _leg_phase = 0;        // separate leg cycle (1.2s vs body 1.8s)
     lv_anim_t _legAnim{};
+    lv_anim_t _clawBobAnim{};   // celebrate: gentle claw oscillation
 
     ClawdState _state = ClawdState::Idle;
 };
