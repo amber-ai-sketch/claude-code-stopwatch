@@ -51,12 +51,42 @@
   @keyframes leanIn{0%,100%{transform:translateY(0) rotate(0);}50%{transform:translateY(-4px) rotate(-2deg);}}
   .wait .clawL{animation:helloWave 3s ease-in-out infinite;transform-origin:right bottom;}
   @keyframes helloWave{0%,100%{transform:rotate(-12deg) translateY(-8px);}50%{transform:rotate(-20deg) translateY(-12px);}}
+
+  /* ④ CELEBRATE: spring-driven bounce — overshoot, bounce back, settle.
+     One-shot (2s), then holds the rest pose. Mimics Spring(1000ms, 0.5 bounce). */
+  .celeb .body{animation:celebBounce 2s cubic-bezier(.36,1.4,.5,.95) 1 forwards;transform-origin:center;}
+  @keyframes celebBounce{
+    0%{transform:translateY(0);}
+    18%{transform:translateY(-18px);}
+    38%{transform:translateY(4px);}
+    52%{transform:translateY(-10px);}
+    68%{transform:translateY(2px);}
+    80%{transform:translateY(-4px);}
+    100%{transform:translateY(0);}
+  }
+  .celeb .clawL,.celeb .clawR{animation:celebClaws 2s cubic-bezier(.36,1.4,.5,.95) 1 forwards;transform-origin:center;}
+  @keyframes celebClaws{
+    0%{transform:translateY(0);}
+    18%{transform:translateY(-22px);}
+    38%{transform:translateY(3px);}
+    52%{transform:translateY(-12px);}
+    68%{transform:translateY(2px);}
+    80%{transform:translateY(-3px);}
+    100%{transform:translateY(0);}
+  }
+  .celeb .legL,.celeb .legR{animation:celebLegs 2s cubic-bezier(.36,1.4,.5,.95) 1 forwards;transform-origin:center bottom;}
+  @keyframes celebLegs{
+    0%{transform:translateY(0);}
+    18%{transform:translateY(4px);}
+    52%{transform:translateY(2px);}
+    100%{transform:translateY(0);}
+  }
 </style>
 </head>
 <body>
 
-<h1>Clawd · 三态（peace · proactive）</h1>
-<p class="sub">平和而主动，绝不制造焦虑 · 暖橙统一无警报色 · 浏览器打开本文件看完整动效</p>
+<h1>Clawd · 四态（peace · proactive）</h1>
+<p class="sub">平和而主动，绝不制造焦虑 · 暖橙统一无警报色 · 浏览器打开本文件看完整动效（④ 刷新页面重播）</p>
 <img class="ref" src="clawd_ref.jpg" alt="ref">
 <p class="reflbl">↑ 官方参考</p>
 
@@ -140,6 +170,31 @@
     </div>
     <div class="cap"><b style="color:#D97757;">③ 等待你</b>
       <p>平和主动：轻轻转向你、举起一只钳子打招呼。暖橙光晕柔和呼吸 —— 是邀请，不是警报。</p></div>
+  </div>
+
+  <!-- ④ CELEBRATE -->
+  <div class="stage">
+    <div class="watch celeb">
+      <svg viewBox="0 0 380 380">
+        <circle cx="190" cy="190" r="168" fill="none" stroke="#1a1410" stroke-width="8"/>
+        <g class="body" fill="#D97757">
+          <rect class="clawL" x="110" y="132" width="18" height="18"/>
+          <rect class="clawR" x="252" y="132" width="18" height="18"/>
+          <rect x="128" y="114" width="124" height="72"/>
+          <rect class="legL" x="138" y="186" width="16" height="26"/>
+          <rect class="legL" x="166" y="186" width="16" height="26"/>
+          <rect class="legR" x="198" y="186" width="16" height="26"/>
+          <rect class="legR" x="226" y="186" width="16" height="26"/>
+          <rect x="152" y="132" width="18" height="18" fill="#0d0d0d"/>
+          <rect x="210" y="132" width="18" height="18" fill="#0d0d0d"/>
+        </g>
+      </svg>
+      <div class="lbl" style="top:48px;"><span class="chip run">done!</span></div>
+      <div class="lbl hero" style="top:250px; font-size:46px;">0<span class="dim" style="font-size:28px;"> / 0</span></div>
+      <div class="lbl grey" style="top:302px; font-size:14px;">all done</div>
+    </div>
+    <div class="cap"><b style="color:#D97757;">④ 庆祝</b>
+      <p>Spring 弹跳：身体上跃过冲、钳子扬起、腿微缩，回弹两次后安定。任一 session 从 working→idle 时触发，持续 ~2 秒。</p></div>
   </div>
 
 </div>
