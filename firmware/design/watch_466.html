@@ -34,8 +34,9 @@
 </p>
 
 <div class="pair">
-  <div><div class="watch" id="ov"></div><div class="cap"><b>总览页</b> · 电池条 y44 · chip 22 · count 44 · sub 20</div></div>
-  <div><div class="watch" id="se"></div><div class="cap"><b>session 页</b> · ⌀450 弧环 110° 缺口 · 线宽 14 · 标题宽 260</div></div>
+  <div><div class="watch" id="ov"></div><div class="cap"><b>总览页</b> · 电池条 y44 · chip 22 · count 44</div></div>
+  <div><div class="watch" id="rc"></div><div class="cap"><b>断连页</b> · chip "reconnecting" · 宠物 idle 态 · count dim</div></div>
+  <div><div class="watch" id="se"></div><div class="cap"><b>session 页</b> · ⌀462 弧环 110° 缺口 · 线宽 14 · 标题宽 260</div></div>
 </div>
 
 <div style="height:48px"></div>
@@ -147,6 +148,31 @@ const chipBgWorking="#33221a";
   pet(w,233,237);
   el(w,{align:'center',dy:136,font:44,color:WHITE,text:'2 / 3'});
   pager(w,4,0,38);
+})();
+
+// ───── 断连页 ─────
+(function(){
+  const w=document.getElementById('rc');
+  const BAT_W=110, BAT_H=5, BAT_Y=44;
+  const batTrack=document.createElement('div');
+  batTrack.style.cssText=`position:absolute;left:50%;top:${BAT_Y-BAT_H/2}px;transform:translateX(-50%);
+    width:${BAT_W}px;height:${BAT_H}px;border-radius:${BAT_H/2}px;background:#2a2a2a;`;
+  const batFill=document.createElement('div');
+  batFill.style.cssText=`position:absolute;left:0;top:0;width:${Math.round(BAT_W*0.72)}px;height:100%;
+    border-radius:${BAT_H/2}px;background:#c49a6c;`;
+  batTrack.appendChild(batFill);
+  w.appendChild(batTrack);
+  const batPct=document.createElement('div');
+  batPct.className='el';
+  batPct.style.cssText=`position:absolute;top:${BAT_Y-7}px;left:calc(50% + ${BAT_W/2+6}px);
+    font-size:14px;color:#555;line-height:1;white-space:nowrap;`;
+  batPct.textContent='72';
+  w.appendChild(batPct);
+
+  el(w,{align:'top',dy:104,font:22,chip:1,chipBg:'#1a1a1a',color:DIMIDLE,text:'reconnecting'});
+  pet(w,233,237);
+  el(w,{align:'center',dy:136,font:44,color:'#666',text:'-'});
+  pager(w,1,0,38);
 })();
 
 // token 四宫格
