@@ -29,8 +29,11 @@ public:
     ~WatchFace();
 
     void show();
-    void apply(const WatchState& state, bool ble_connected);  // call ~5x/s from the app loop
-    void next_page();                     // cycle: overview → sessions → overview
+    void apply(const WatchState& state, bool ble_connected);
+    void next_page();
+    void show_cheatsheet();
+    void hide_cheatsheet();
+    int  current_page() const { return _current_page_idx; }
 
     lv_obj_t* screen() { return _screen; }
 
@@ -39,16 +42,21 @@ private:
     void _rebuild_pager(int page_count);
     void _highlight_pager(int active);
     void _show_page(int idx);
-    static void _on_tap(lv_event_t* e);
-
-    // Cheatsheet overlay (shown on swipe-down from overview).
-    lv_obj_t* _cheatsheet  = nullptr;
-    lv_point_t _swipe_start = {};
-    bool       _swipe_active = false;
     lv_obj_t* _build_cheatsheet();
     static void _on_touch_start(lv_event_t* e);
+    static void _on_touch_move(lv_event_t* e);
     static void _on_touch_end(lv_event_t* e);
     static void _on_cheatsheet_tap(lv_event_t* e);
+
+    // Touch tracking for tap-vs-swipe discrimination on the click mask.
+    // _touch_last is updated every PRESSING tick because the RELEASED-time
+    // indev point is stale (finger already lifted).
+    lv_point_t _touch_start = {};
+    lv_point_t _touch_last  = {};
+    bool       _touch_active = false;
+    static constexpr int32_t kTapMaxDist = 15;  // px; below = tap, above = swipe
+
+    lv_obj_t* _cheatsheet = nullptr;
 
     lv_obj_t* _screen     = nullptr;
     lv_obj_t* _container  = nullptr;    // plain container, holds all pages

@@ -18,8 +18,9 @@ const char* kTokLabels[4] = {"INPUT", "OUTPUT", "CACHE HIT", "CACHE WRITE"};
 // Two columns (centers ±76 of mid) × two rows. Y is the value's center
 // offset from screen center; the caption sits 26px below.
 constexpr int kColDx   = 76;
-constexpr int kRow1Dy  = 6;    // value center offset from screen center
-constexpr int kRow2Dy  = 74;
+// Equal 30px gaps: chip-bottom(174) → row1 top → row1 cap bottom → row2 top → row2 cap bottom → footer-top(364)
+constexpr int kRow1Dy  = -14;  // value center offset from screen center
+constexpr int kRow2Dy  =  66;
 constexpr int kCapGap  = 26;   // caption below its value
 
 // "15500" → "15.5k", "82000" → "82k", "950" → "950". Keeps the grid tidy.
@@ -38,40 +39,40 @@ SessionPage::SessionPage(lv_obj_t* parent)
     lv_obj_set_style_bg_color(parent, lv_color_black(), 0);
     lv_obj_set_style_bg_opa(parent, LV_OPA_COVER, 0);
 
-    // Context fill ring with a 100° gap centered at the bottom, so the
+    // Context fill ring with a 110° gap centered at the bottom, so the
     // footer + pager sit in the gap and never overlap the arc. LVGL angles
-    // run clockwise from 3 o'clock; bottom is 90°. A gap of 100° spans
-    // 40°→140°, so the track is the 260° arc from 140° round to 40°.
+    // run clockwise from 3 o'clock; bottom is 90°. A gap of 110° spans
+    // 35°→145°, so the track is the 250° arc from 145° round to 35°.
     _ring = lv_arc_create(parent);
-    lv_obj_set_size(_ring, 430, 430);
+    lv_obj_set_size(_ring, 450, 450);
     lv_obj_center(_ring);
-    lv_arc_set_bg_angles(_ring, 140, 360 + 40);   // 140° → 400° (=40°), 260° track
+    lv_arc_set_bg_angles(_ring, 145, 360 + 35);   // 145° → 395° (=35°), 250° track
     lv_arc_set_range(_ring, 0, 100);
     lv_arc_set_value(_ring, 0);
     lv_obj_remove_style(_ring, NULL, LV_PART_KNOB);
-    lv_obj_set_style_arc_width(_ring, 12, LV_PART_MAIN);
-    lv_obj_set_style_arc_width(_ring, 12, LV_PART_INDICATOR);
+    lv_obj_set_style_arc_width(_ring, 14, LV_PART_MAIN);
+    lv_obj_set_style_arc_width(_ring, 14, LV_PART_INDICATOR);
     lv_obj_set_style_arc_color(_ring, kArcTrack, LV_PART_MAIN);
     lv_obj_set_style_arc_color(_ring, kOrange, LV_PART_INDICATOR);
     lv_obj_remove_flag(_ring, LV_OBJ_FLAG_CLICKABLE);
+    lv_obj_remove_flag(_ring, LV_OBJ_FLAG_CLICK_FOCUSABLE);
 
     // Title: project name.
     _title = lv_label_create(parent);
     lv_obj_set_style_text_font(_title, &lv_font_montserrat_22, 0);
     lv_obj_set_style_text_color(_title, lv_color_white(), 0);
     lv_label_set_long_mode(_title, LV_LABEL_LONG_DOT);
-    lv_obj_set_width(_title, 320);
+    lv_obj_set_width(_title, 260);
     lv_obj_set_style_text_align(_title, LV_TEXT_ALIGN_CENTER, 0);
     lv_label_set_text(_title, "—");
     lv_obj_align(_title, LV_ALIGN_TOP_MID, 0, 84);
 
-    // Model — sits just above the footer ($cost · tool) at the bottom,
-    // away from the title area so long session names never overlap it.
+    // Model — sits above the footer in the ring's bottom gap.
     _model = lv_label_create(parent);
     lv_obj_set_style_text_font(_model, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(_model, kGrey, 0);
     lv_label_set_text(_model, "—");
-    lv_obj_align(_model, LV_ALIGN_BOTTOM_MID, 0, -44);
+    lv_obj_align(_model, LV_ALIGN_BOTTOM_MID, 0, -52);
 
     // Status chip.
     _chip = lv_obj_create(parent);
@@ -110,7 +111,7 @@ SessionPage::SessionPage(lv_obj_t* parent)
     lv_obj_set_style_text_font(_footer, &lv_font_montserrat_16, 0);
     lv_obj_set_style_text_color(_footer, kGrey, 0);
     lv_label_set_text(_footer, "");
-    lv_obj_align(_footer, LV_ALIGN_BOTTOM_MID, 0, -64);
+    lv_obj_align(_footer, LV_ALIGN_BOTTOM_MID, 0, -80);
 }
 
 void SessionPage::update(int ordinal, int count,
