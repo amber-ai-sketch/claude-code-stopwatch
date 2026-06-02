@@ -53,7 +53,8 @@
   @keyframes helloWave{0%,100%{transform:rotate(-12deg) translateY(-8px);}50%{transform:rotate(-20deg) translateY(-12px);}}
 
   /* ④ CELEBRATE: spring-driven bounce + fast leg wiggle.
-     Bounce overshoots and settles; legs keep wiggling the full 2s. */
+     Bounce overshoots and settles in ~1.5s; legs wiggle for ~3.5s;
+     claws keep bobbing after bounce. Total ~5s. */
   .celeb .body{animation:celebBounce 2s cubic-bezier(.36,1.4,.5,.95) 1 forwards;transform-origin:center;}
   @keyframes celebBounce{
     0%{transform:translateY(0);}
@@ -79,8 +80,8 @@
     100%{transform:translateY(0);}
   }
   @keyframes celebClawIdle{0%,100%{transform:translateY(0);}50%{transform:translateY(-3px);}}
-  .celeb .legL{animation:celebStepA .35s ease-in-out 2;transform-origin:center bottom;}
-  .celeb .legR{animation:celebStepB .35s ease-in-out 2;transform-origin:center bottom;}
+  .celeb .legL{animation:celebStepA .35s ease-in-out 5;transform-origin:center bottom;}
+  .celeb .legR{animation:celebStepB .35s ease-in-out 5;transform-origin:center bottom;}
   @keyframes celebStepA{0%,100%{transform:translateY(0);}50%{transform:translateY(3px);}}
   @keyframes celebStepB{0%,100%{transform:translateY(3px);}50%{transform:translateY(0);}}
 </style>

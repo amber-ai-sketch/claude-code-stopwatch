@@ -78,7 +78,7 @@ private:
     std::map<std::string, bool> _prev_session_running;
     bool     _celebrate_active = false;
     uint32_t _celebrate_start_ms = 0;
-    static constexpr uint32_t kCelebrateMs = 2000;
+    static constexpr uint32_t kCelebrateMs = 5000;
 
     // Voice transcript overlay — shows dictated text briefly after recording.
     lv_obj_t* _transcript_panel = nullptr;

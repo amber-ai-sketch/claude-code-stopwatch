@@ -209,7 +209,7 @@ void ClawdPet::set_state(ClawdState state)
         lv_anim_set_var(&a, this);
         lv_anim_set_exec_cb(&a, clawd_celebrate_tick);
         lv_anim_set_values(&a, 0, 1000);
-        lv_anim_set_duration(&a, 2000);
+        lv_anim_set_duration(&a, 5000);
         lv_anim_set_path_cb(&a, lv_anim_path_linear);
         lv_anim_set_playback_duration(&a, 0);
         lv_anim_set_repeat_count(&a, 1);
@@ -226,7 +226,7 @@ void ClawdPet::set_state(ClawdState state)
         lv_anim_set_duration(&_legAnim, 350);
         lv_anim_set_path_cb(&_legAnim, lv_anim_path_ease_in_out);
         lv_anim_set_playback_duration(&_legAnim, 350);
-        lv_anim_set_repeat_count(&_legAnim, 2);
+        lv_anim_set_repeat_count(&_legAnim, 5);
         lv_anim_start(&_legAnim);
     } else {
         uint32_t dur = (state == ClawdState::Working) ? 1800
