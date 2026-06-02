@@ -64,7 +64,11 @@
     80%{transform:translateY(-4px);}
     100%{transform:translateY(0);}
   }
-  .celeb .clawL,.celeb .clawR{animation:celebClaws 2s cubic-bezier(.36,1.4,.5,.95) 1 forwards;transform-origin:center;}
+  .celeb .clawL,.celeb .clawR{
+    animation:celebClaws 2s cubic-bezier(.36,1.4,.5,.95) 1 forwards,
+              celebClawIdle .8s ease-in-out 2s infinite;
+    transform-origin:center;
+  }
   @keyframes celebClaws{
     0%{transform:translateY(0);}
     18%{transform:translateY(-22px);}
@@ -74,6 +78,7 @@
     80%{transform:translateY(-3px);}
     100%{transform:translateY(0);}
   }
+  @keyframes celebClawIdle{0%,100%{transform:translateY(0);}50%{transform:translateY(-3px);}}
   .celeb .legL{animation:celebStepA .35s ease-in-out 2;transform-origin:center bottom;}
   .celeb .legR{animation:celebStepB .35s ease-in-out 2;transform-origin:center bottom;}
   @keyframes celebStepA{0%,100%{transform:translateY(0);}50%{transform:translateY(3px);}}
