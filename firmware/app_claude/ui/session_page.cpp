@@ -56,14 +56,14 @@ SessionPage::SessionPage(lv_obj_t* parent)
     lv_label_set_long_mode(_title, LV_LABEL_LONG_DOT);
     lv_obj_set_width(_title, 260);
     lv_obj_set_style_text_align(_title, LV_TEXT_ALIGN_CENTER, 0);
-    lv_label_set_text(_title, "—");
+    lv_label_set_text(_title, "-");
     lv_obj_align(_title, LV_ALIGN_TOP_MID, 0, 84);
 
     // Model — sits above the footer in the ring's bottom gap.
     _model = lv_label_create(parent);
     lv_obj_set_style_text_font(_model, &lv_font_montserrat_14, 0);
     lv_obj_set_style_text_color(_model, kGrey, 0);
-    lv_label_set_text(_model, "—");
+    lv_label_set_text(_model, "-");
     lv_obj_align(_model, LV_ALIGN_BOTTOM_MID, 0, -52);
 
     // Status chip.
@@ -144,7 +144,7 @@ void SessionPage::update(int ordinal, int count,
                                 : !project.empty() ? project.c_str()
                                 : "session";
     lv_label_set_text(_title, display_title);
-    lv_label_set_text(_model, model.empty() ? "—" : model.c_str());
+    lv_label_set_text(_model, model.empty() ? "-" : model.c_str());
 
     // Chip.
     const char* chip_text;

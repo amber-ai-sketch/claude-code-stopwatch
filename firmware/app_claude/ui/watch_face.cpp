@@ -386,6 +386,14 @@ void WatchFace::apply(const WatchState& state, bool ble_connected)
     int running = state.sessions_running;
     int waiting = state.sessions_waiting;
 
+    // BLE disconnected: hide all session pages so stale data (including
+    // any leftover race-corrupted text) doesn't show through.
+    if (!ble_connected) {
+        for (auto* p : _session_pages) {
+            lv_obj_set_pos(p, 0, kScreenSize + 100);
+        }
+    }
+
     // Copy the vector once — used for both transition detection and page updates.
     auto sessions_copy = state.session_details;
 

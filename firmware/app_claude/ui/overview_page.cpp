@@ -124,7 +124,7 @@ void OverviewPage::update(int sessions_total, int sessions_running, int sessions
         lv_label_set_text(_chip_label, "reconnecting");
         lv_obj_set_style_text_color(_chip_label, kDimIdle, 0);
         lv_obj_set_style_bg_color(_chip, kChipBgIdle, 0);
-        lv_label_set_text(_count, "—");
+        lv_label_set_text(_count, "-");
         if (_shown != ClawdState::Idle) {
             _pet->set_state(ClawdState::Idle);
             _shown = ClawdState::Idle;
