@@ -5,6 +5,7 @@
 #include "watch_face.h"
 #include "design_tokens.h"
 #include <stdio.h>
+#include <esp_log.h>
 
 namespace clawd_watch {
 
@@ -49,23 +50,23 @@ WatchFace::WatchFace()
     lv_obj_set_flex_align(_pager, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER, LV_FLEX_ALIGN_CENTER);
     lv_obj_set_style_pad_column(_pager, kDotGap - kDot, 0);
 
-    // ── Click mask (transparent, on top, captures taps) ─────────
-    // Pattern from M5Stack official demo: a transparent overlay with
-    // LV_OBJ_FLAG_SCROLLABLE removed reliably receives LV_EVENT_CLICKED.
+    // ── Click mask (near-transparent, on top, captures touches) ──
+    // Full-screen overlay that receives all PRESSED/RELEASED events.
+    // opa=1 (not TRANSP) because LVGL's hit-test misses fully transparent
+    // objects — see commit e279a9f. SCROLLABLE removed so the press isn't
+    // swallowed by scroll handling.
     _click_mask = lv_obj_create(_screen);
     lv_obj_remove_style_all(_click_mask);
     lv_obj_set_size(_click_mask, kScreenSize, kScreenSize);
-    lv_obj_set_style_bg_opa(_click_mask, LV_OPA_1, 0);
+    lv_obj_set_style_bg_opa(_click_mask, 1, 0);
     lv_obj_remove_flag(_click_mask, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_flag(_click_mask, LV_OBJ_FLAG_CLICKABLE);
-    lv_obj_add_event_cb(_click_mask, _on_tap, LV_EVENT_CLICKED, this);
+    lv_obj_add_event_cb(_click_mask, _on_touch_start, LV_EVENT_PRESSED, this);
+    lv_obj_add_event_cb(_click_mask, _on_touch_move,  LV_EVENT_PRESSING, this);
+    lv_obj_add_event_cb(_click_mask, _on_touch_end,   LV_EVENT_RELEASED, this);
     lv_obj_move_foreground(_click_mask);
     // Keep pager visible above the click mask.
     lv_obj_move_foreground(_pager);
-
-    // Swipe-down on overview → cheatsheet.
-    lv_obj_add_event_cb(_click_mask, _on_touch_start, LV_EVENT_PRESSED, this);
-    lv_obj_add_event_cb(_click_mask, _on_touch_end,   LV_EVENT_RELEASED, this);
     _cheatsheet = _build_cheatsheet();
     lv_obj_move_foreground(_cheatsheet);
 
@@ -90,6 +91,8 @@ WatchFace::WatchFace()
     lv_label_set_long_mode(_transcript_label, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(_transcript_label, kScreenSize - 68);
     lv_label_set_text(_transcript_label, "");
+
+    ESP_LOGE("GEST", "WATCHFACE CTOR DONE build=%s %s", __DATE__, __TIME__);
 }
 
 WatchFace::~WatchFace()
@@ -134,55 +137,116 @@ void WatchFace::_highlight_pager(int active)
 
 lv_obj_t* WatchFace::_build_cheatsheet()
 {
+    // Full-screen solid black overlay — acts as its own page.
     lv_obj_t* cs = lv_obj_create(_screen);
     lv_obj_remove_style_all(cs);
     lv_obj_set_size(cs, kScreenSize, kScreenSize);
     lv_obj_set_style_bg_color(cs, lv_color_black(), 0);
-    lv_obj_set_style_bg_opa(cs, 210, 0);  // ~82% opacity
+    lv_obj_set_style_bg_opa(cs, LV_OPA_COVER, 0);
     lv_obj_add_flag(cs, LV_OBJ_FLAG_CLICKABLE);
     lv_obj_add_flag(cs, LV_OBJ_FLAG_HIDDEN);
     lv_obj_remove_flag(cs, LV_OBJ_FLAG_SCROLLABLE);
     lv_obj_add_event_cb(cs, _on_cheatsheet_tap, LV_EVENT_CLICKED, this);
 
-    // Title
+    // ── Header ────────────────────────────────────────────────────
     lv_obj_t* title = lv_label_create(cs);
-    lv_obj_set_style_text_font(title, &lv_font_montserrat_22, 0);
-    lv_obj_set_style_text_color(title, lv_color_white(), 0);
-    lv_label_set_text(title, "Buttons");
-    lv_obj_align(title, LV_ALIGN_CENTER, 0, -90);
+    lv_obj_set_style_text_font(title, &lv_font_montserrat_20, 0);
+    lv_obj_set_style_text_color(title, kGrey, 0);
+    lv_label_set_text(title, "BUTTON REFERENCE");
+    lv_obj_align(title, LV_ALIGN_CENTER, 0, -122);
 
-    // Left A header
-    lv_obj_t* la = lv_label_create(cs);
-    lv_obj_set_style_text_font(la, &lv_font_montserrat_16, 0);
-    lv_obj_set_style_text_color(la, kOrange, 0);
-    lv_label_set_text(la, "\xe2\x97\x80 A");  // ◀ A
-    lv_obj_align(la, LV_ALIGN_CENTER, 0, -48);
+    // ── Divider ───────────────────────────────────────────────────
+    lv_obj_t* div = lv_obj_create(cs);
+    lv_obj_remove_style_all(div);
+    lv_obj_set_size(div, 160, 1);
+    lv_obj_set_style_bg_color(div, kDim, 0);
+    lv_obj_set_style_bg_opa(div, LV_OPA_COVER, 0);
+    lv_obj_align(div, LV_ALIGN_CENTER, 0, -100);
 
-    lv_obj_t* la_desc = lv_label_create(cs);
-    lv_obj_set_style_text_font(la_desc, &lv_font_montserrat_14, 0);
-    lv_obj_set_style_text_color(la_desc, kGrey, 0);
-    lv_label_set_text(la_desc, "Tap \xe2\x86\x92 Backspace  \xc2\xb7  Hold \xe2\x86\x92 Enter");
-    lv_obj_align(la_desc, LV_ALIGN_CENTER, 0, -26);
+    // ── Left A ────────────────────────────────────────────────────
+    lv_obj_t* la_key = lv_label_create(cs);
+    lv_obj_set_style_text_font(la_key, &lv_font_montserrat_22, 0);
+    lv_obj_set_style_text_color(la_key, lv_color_white(), 0);
+    lv_label_set_text(la_key, "A");
+    lv_obj_align(la_key, LV_ALIGN_CENTER, -60, -64);
 
-    // Right B header
-    lv_obj_t* rb = lv_label_create(cs);
-    lv_obj_set_style_text_font(rb, &lv_font_montserrat_16, 0);
-    lv_obj_set_style_text_color(rb, kOrange, 0);
-    lv_label_set_text(rb, "\xe2\x96\xb6 B");  // ▶ B
-    lv_obj_align(rb, LV_ALIGN_CENTER, 0, 16);
+    lv_obj_t* la_tap = lv_label_create(cs);
+    lv_obj_set_style_text_font(la_tap, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_color(la_tap, kOrange, 0);
+    lv_label_set_text(la_tap, "tap");
+    lv_obj_align(la_tap, LV_ALIGN_CENTER, -60, -36);
 
-    lv_obj_t* rb_desc = lv_label_create(cs);
-    lv_obj_set_style_text_font(rb_desc, &lv_font_montserrat_14, 0);
-    lv_obj_set_style_text_color(rb_desc, kGrey, 0);
-    lv_label_set_text(rb_desc, "Tap \xe2\x86\x92 Esc  \xc2\xb7  Hold \xe2\x86\x92 WeChat/Mic");
-    lv_obj_align(rb_desc, LV_ALIGN_CENTER, 0, 38);
+    lv_obj_t* la_tap_v = lv_label_create(cs);
+    lv_obj_set_style_text_font(la_tap_v, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(la_tap_v, kGrey, 0);
+    lv_label_set_text(la_tap_v, "Backspace");
+    lv_obj_align(la_tap_v, LV_ALIGN_CENTER, -60, -16);
 
-    // Screen hint
+    lv_obj_t* la_hold = lv_label_create(cs);
+    lv_obj_set_style_text_font(la_hold, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_color(la_hold, kOrange, 0);
+    lv_label_set_text(la_hold, "hold");
+    lv_obj_align(la_hold, LV_ALIGN_CENTER, -60, 10);
+
+    lv_obj_t* la_hold_v = lv_label_create(cs);
+    lv_obj_set_style_text_font(la_hold_v, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(la_hold_v, kGrey, 0);
+    lv_label_set_text(la_hold_v, "Enter");
+    lv_obj_align(la_hold_v, LV_ALIGN_CENTER, -60, 30);
+
+    // ── Vertical separator ────────────────────────────────────────
+    lv_obj_t* vsep = lv_obj_create(cs);
+    lv_obj_remove_style_all(vsep);
+    lv_obj_set_size(vsep, 1, 110);
+    lv_obj_set_style_bg_color(vsep, kDim, 0);
+    lv_obj_set_style_bg_opa(vsep, LV_OPA_COVER, 0);
+    lv_obj_align(vsep, LV_ALIGN_CENTER, 0, -10);
+
+    // ── Right B ───────────────────────────────────────────────────
+    lv_obj_t* rb_key = lv_label_create(cs);
+    lv_obj_set_style_text_font(rb_key, &lv_font_montserrat_22, 0);
+    lv_obj_set_style_text_color(rb_key, lv_color_white(), 0);
+    lv_label_set_text(rb_key, "B");
+    lv_obj_align(rb_key, LV_ALIGN_CENTER, 60, -64);
+
+    lv_obj_t* rb_tap = lv_label_create(cs);
+    lv_obj_set_style_text_font(rb_tap, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_color(rb_tap, kOrange, 0);
+    lv_label_set_text(rb_tap, "tap");
+    lv_obj_align(rb_tap, LV_ALIGN_CENTER, 60, -36);
+
+    lv_obj_t* rb_tap_v = lv_label_create(cs);
+    lv_obj_set_style_text_font(rb_tap_v, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(rb_tap_v, kGrey, 0);
+    lv_label_set_text(rb_tap_v, "Esc");
+    lv_obj_align(rb_tap_v, LV_ALIGN_CENTER, 60, -16);
+
+    lv_obj_t* rb_hold = lv_label_create(cs);
+    lv_obj_set_style_text_font(rb_hold, &lv_font_montserrat_16, 0);
+    lv_obj_set_style_text_color(rb_hold, kOrange, 0);
+    lv_label_set_text(rb_hold, "hold");
+    lv_obj_align(rb_hold, LV_ALIGN_CENTER, 60, 10);
+
+    lv_obj_t* rb_hold_v = lv_label_create(cs);
+    lv_obj_set_style_text_font(rb_hold_v, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(rb_hold_v, kGrey, 0);
+    lv_label_set_text(rb_hold_v, "WeChat / Mic");
+    lv_obj_align(rb_hold_v, LV_ALIGN_CENTER, 60, 30);
+
+    // ── Divider ───────────────────────────────────────────────────
+    lv_obj_t* div2 = lv_obj_create(cs);
+    lv_obj_remove_style_all(div2);
+    lv_obj_set_size(div2, 160, 1);
+    lv_obj_set_style_bg_color(div2, kDim, 0);
+    lv_obj_set_style_bg_opa(div2, LV_OPA_COVER, 0);
+    lv_obj_align(div2, LV_ALIGN_CENTER, 0, 78);
+
+    // ── Dismiss hint ──────────────────────────────────────────────
     lv_obj_t* hint = lv_label_create(cs);
     lv_obj_set_style_text_font(hint, &lv_font_montserrat_14, 0);
-    lv_obj_set_style_text_color(hint, kDim, 0);
-    lv_label_set_text(hint, "Tap \xe2\x86\x92 next page  \xc2\xb7  Swipe \xe2\x86\x93 \xe2\x86\x92 this screen");
-    lv_obj_align(hint, LV_ALIGN_CENTER, 0, 92);
+    lv_obj_set_style_text_color(hint, kDimIdle, 0);
+    lv_label_set_text(hint, "tap anywhere to dismiss");
+    lv_obj_align(hint, LV_ALIGN_CENTER, 0, 100);
 
     return cs;
 }
@@ -198,6 +262,7 @@ void WatchFace::_rebuild_session_pages(int count)
         // Create directly on _screen (not _container) to avoid rendering issues.
         lv_obj_t* page = lv_obj_create(_screen);
         lv_obj_remove_flag(page, LV_OBJ_FLAG_SCROLLABLE);
+        lv_obj_remove_flag(page, LV_OBJ_FLAG_CLICK_FOCUSABLE);
         lv_obj_set_size(page, kScreenSize, kScreenSize);
         lv_obj_set_style_bg_opa(page, LV_OPA_TRANSP, 0);
         lv_obj_set_style_border_width(page, 0, 0);
@@ -221,43 +286,67 @@ void WatchFace::_rebuild_session_pages(int count)
     _show_page(stay);
 }
 
-void WatchFace::_on_tap(lv_event_t* e)
+void WatchFace::_on_cheatsheet_tap(lv_event_t* e)
 {
     auto* self = static_cast<WatchFace*>(lv_event_get_user_data(e));
-    self->next_page();
+    if (self->_cheatsheet) lv_obj_add_flag(self->_cheatsheet, LV_OBJ_FLAG_HIDDEN);
 }
 
 void WatchFace::_on_touch_start(lv_event_t* e)
 {
     auto* self = static_cast<WatchFace*>(lv_event_get_user_data(e));
-    lv_indev_get_point(lv_indev_get_act(), &self->_swipe_start);
-    self->_swipe_active = true;
+    lv_indev_get_point(lv_indev_get_act(), &self->_touch_start);
+    self->_touch_last = self->_touch_start;  // seed so a tap (no move) reads zero
+    self->_touch_active = true;
+    ESP_LOGE("GEST", "DOWN x=%d y=%d", (int)self->_touch_start.x, (int)self->_touch_start.y);
+}
+
+void WatchFace::_on_touch_move(lv_event_t* e)
+{
+    auto* self = static_cast<WatchFace*>(lv_event_get_user_data(e));
+    // Track the live finger position throughout the drag. At RELEASED the
+    // indev point is already stale (finger lifted), so we use this instead.
+    lv_indev_get_point(lv_indev_get_act(), &self->_touch_last);
+    ESP_LOGE("GEST", "MOVE x=%d y=%d", (int)self->_touch_last.x, (int)self->_touch_last.y);
 }
 
 void WatchFace::_on_touch_end(lv_event_t* e)
 {
     auto* self = static_cast<WatchFace*>(lv_event_get_user_data(e));
-    if (!self->_swipe_active) return;
-    self->_swipe_active = false;
+    if (!self->_touch_active) return;
+    self->_touch_active = false;
 
-    lv_point_t end;
-    lv_indev_get_point(lv_indev_get_act(), &end);
+    int32_t dx = self->_touch_last.x - self->_touch_start.x;
+    int32_t dy = self->_touch_last.y - self->_touch_start.y;
+    int32_t dist = LV_MAX(LV_ABS(dx), LV_ABS(dy));
+    ESP_LOGE("GEST", "UP start=(%d,%d) last=(%d,%d) dx=%d dy=%d dist=%d",
+             (int)self->_touch_start.x, (int)self->_touch_start.y,
+             (int)self->_touch_last.x, (int)self->_touch_last.y,
+             (int)dx, (int)dy, (int)dist);
 
-    int32_t dy = end.y - self->_swipe_start.y;
-    int32_t dx = end.x - self->_swipe_start.x;
-    bool is_swipe_down = (dy > 80) && (LV_ABS(dy) > LV_ABS(dx));
+    // Tap (no meaningful movement) → next page. From the overview this
+    // advances to the first session, satisfying "tap on home → session".
+    if (dist < kTapMaxDist) {
+        self->next_page();
+        return;
+    }
 
-    if (is_swipe_down && self->_current_page_idx == 0 && self->_cheatsheet) {
-        lv_obj_clear_flag(self->_cheatsheet, LV_OBJ_FLAG_HIDDEN);
+    // Swipe on the overview: only a downward swipe opens the cheatsheet.
+    // Up / left / right are ignored. Session pages ignore swipes entirely.
+    if (self->_current_page_idx == 0) {
+        bool is_down = (dy > 0) && (LV_ABS(dy) > LV_ABS(dx));
+        if (is_down) lv_obj_clear_flag(self->_cheatsheet, LV_OBJ_FLAG_HIDDEN);
     }
 }
 
-void WatchFace::_on_cheatsheet_tap(lv_event_t* e)
+void WatchFace::show_cheatsheet()
 {
-    auto* self = static_cast<WatchFace*>(lv_event_get_user_data(e));
-    if (self->_cheatsheet) {
-        lv_obj_add_flag(self->_cheatsheet, LV_OBJ_FLAG_HIDDEN);
-    }
+    if (_cheatsheet) lv_obj_clear_flag(_cheatsheet, LV_OBJ_FLAG_HIDDEN);
+}
+
+void WatchFace::hide_cheatsheet()
+{
+    if (_cheatsheet) lv_obj_add_flag(_cheatsheet, LV_OBJ_FLAG_HIDDEN);
 }
 
 void WatchFace::next_page()
@@ -300,9 +389,11 @@ void WatchFace::apply(const WatchState& state, bool ble_connected)
     // Celebration: when running drops from >0 to 0 and nothing is waiting,
     // briefly show a happy bounce before settling into idle.
     if (_prev_running > 0 && running == 0 && waiting == 0) {
-        _overview->update(total, 0, 0, ClawdState::Celebrate, ble_connected);
+        _overview->update(total, 0, 0, ClawdState::Celebrate, ble_connected,
+                          state.battery_pct, state.battery_charging);
     } else {
-        _overview->update(total, running, waiting, std::nullopt, ble_connected);
+        _overview->update(total, running, waiting, std::nullopt, ble_connected,
+                          state.battery_pct, state.battery_charging);
     }
     _prev_running = running;
 

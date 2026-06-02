@@ -14,6 +14,16 @@ constexpr int kScreen = 466;
 constexpr int kCx = kScreen / 2;
 constexpr int kCy = kScreen / 2;
 
+// Battery gauge geometry.
+constexpr int kBatW    = 110;   // track width
+constexpr int kBatH    = 5;     // track height (thin)
+constexpr int kBatY    = 44;    // vertical center of the bar
+
+const lv_color_t kBatTrackColor = lv_color_make(0x2a, 0x2a, 0x2a);
+const lv_color_t kBatFillNorm   = lv_color_make(0xc4, 0x9a, 0x6c);  // warm muted amber
+const lv_color_t kBatFillLow    = lv_color_make(0x88, 0x66, 0x44);  // dim when low
+const lv_color_t kBatFillChg    = lv_color_make(0x88, 0xcc, 0x66);  // warm green — charging
+
 }  // namespace
 
 OverviewPage::OverviewPage(lv_obj_t* parent)
@@ -37,8 +47,33 @@ OverviewPage::OverviewPage(lv_obj_t* parent)
     lv_label_set_text(_chip_label, "idle");
     lv_obj_center(_chip_label);
 
-    // Clawd center, nudged up to leave room for the count below.
-    _pet = std::make_unique<ClawdPet>(parent, kCx, kCy - 21);
+    // ── Battery gauge ──
+    // Thin rounded bar near the top edge, centered horizontally.
+    _bat_track = lv_obj_create(parent);
+    lv_obj_remove_style_all(_bat_track);
+    lv_obj_set_size(_bat_track, kBatW, kBatH);
+    lv_obj_set_style_radius(_bat_track, kBatH / 2, 0);
+    lv_obj_set_style_bg_color(_bat_track, kBatTrackColor, 0);
+    lv_obj_set_style_bg_opa(_bat_track, LV_OPA_COVER, 0);
+    lv_obj_align(_bat_track, LV_ALIGN_TOP_MID, 0, kBatY - kBatH / 2);
+
+    _bat_fill = lv_obj_create(_bat_track);
+    lv_obj_remove_style_all(_bat_fill);
+    lv_obj_set_height(_bat_fill, kBatH);
+    lv_obj_set_style_radius(_bat_fill, kBatH / 2, 0);
+    lv_obj_set_style_bg_color(_bat_fill, kBatFillNorm, 0);
+    lv_obj_set_style_bg_opa(_bat_fill, LV_OPA_COVER, 0);
+    lv_obj_align(_bat_fill, LV_ALIGN_LEFT_MID, 0, 0);
+
+    _bat_pct = lv_label_create(parent);
+    lv_obj_set_style_text_font(_bat_pct, &lv_font_montserrat_14, 0);
+    lv_obj_set_style_text_color(_bat_pct, kDimIdle, 0);
+    lv_label_set_text(_bat_pct, "");
+    // Place just to the right of the track.
+    lv_obj_align_to(_bat_pct, _bat_track, LV_ALIGN_OUT_RIGHT_MID, 6, 0);
+
+    // Clawd center — visual center of body at screen center.
+    _pet = std::make_unique<ClawdPet>(parent, kCx, kCy + 4);
 
     // Session tally — hero count, large.
     _count = lv_label_create(parent);
@@ -63,8 +98,33 @@ OverviewPage::~OverviewPage()
 
 void OverviewPage::update(int sessions_total, int sessions_running, int sessions_waiting,
                           std::optional<ClawdState> override_state,
-                          bool ble_connected)
+                          bool ble_connected,
+                          uint8_t battery_pct, bool battery_charging)
 {
+    // ── Battery gauge (always, regardless of BLE) ──
+    int fill_w = (int)battery_pct * kBatW / 100;
+    if (fill_w < 2) fill_w = 2;  // min visible sliver
+    lv_obj_set_width(_bat_fill, fill_w);
+
+    lv_color_t bat_color;
+    if (battery_charging) {
+        bat_color = kBatFillChg;
+    } else if (battery_pct <= 15) {
+        bat_color = kBatFillLow;
+    } else {
+        bat_color = kBatFillNorm;
+    }
+    lv_obj_set_style_bg_color(_bat_fill, bat_color, 0);
+
+    // Pct label — hide when charging (the green bar is self-explanatory).
+    if (battery_charging) {
+        lv_label_set_text(_bat_pct, "");
+    } else {
+        char bat_buf[8];
+        snprintf(bat_buf, sizeof(bat_buf), "%d", battery_pct);
+        lv_label_set_text(_bat_pct, bat_buf);
+    }
+
     // BLE disconnected: show reconnecting state, override everything.
     if (!ble_connected) {
         lv_label_set_text(_chip_label, "reconnecting");
@@ -80,11 +140,27 @@ void OverviewPage::update(int sessions_total, int sessions_running, int sessions
     }
 
     // Decide state. Override takes priority (e.g. Celebrate), then
-    // waiting > working > idle.
-    ClawdState state = override_state.value_or(
+    // waiting > working > idle.  Waiting is debounced: only activate
+    // after 2 consecutive "waiting" updates to avoid brief flicker.
+    ClawdState raw = override_state.value_or(
         sessions_waiting > 0 ? ClawdState::Waiting
       : sessions_running > 0 ? ClawdState::Working
                              : ClawdState::Idle);
+
+    if (raw == ClawdState::Waiting) {
+        _waiting_ticks++;
+    } else {
+        _waiting_ticks = 0;
+    }
+
+    // During debounce (ticks < 2), fall back to Working/Idle instead of
+    // Waiting — prevents a brief flicker when the daemon toggles states.
+    ClawdState state;
+    if (raw == ClawdState::Waiting && _waiting_ticks < 2) {
+        state = sessions_running > 0 ? ClawdState::Working : ClawdState::Idle;
+    } else {
+        state = raw;
+    }
 
     // Chip text + color.
     const char* chip_text;
@@ -122,6 +198,11 @@ void OverviewPage::update(int sessions_total, int sessions_running, int sessions
           : sessions_total > 0   ? "idle"
                                  : "no sessions");
     }
+
+    // Count text: dimmer when idle to match the muted pet.
+    lv_color_t count_color = (state == ClawdState::Idle)
+        ? lv_color_make(0x66, 0x66, 0x66) : lv_color_white();
+    lv_obj_set_style_text_color(_count, count_color, 0);
 
     // Only restart the pet animation when the state actually changes —
     // re-seeding every 200ms would reset its phase and look jittery.

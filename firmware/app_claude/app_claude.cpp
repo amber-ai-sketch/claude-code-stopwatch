@@ -152,6 +152,8 @@ void AppClaude::onRunning()
     // grab the lock; doing this every loop iteration would stall.
     if (now - _last_ui_apply_ms > 200) {
         _last_ui_apply_ms = now;
+        _state.battery_pct      = GetHAL().getBatteryLevel();
+        _state.battery_charging = charging;
         if (_face) {
             LvglLockGuard lock;
             _face->apply(_state, ble_ok);

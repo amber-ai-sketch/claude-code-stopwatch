@@ -71,6 +71,10 @@ struct WatchState {
     // heartbeat that carries a "sessions" array.
     std::vector<SessionInfo> session_details;
 
+    // Hardware — battery
+    uint8_t battery_pct     = 0;    // 0-100
+    bool    battery_charging = false;
+
     // Voice transcript echo — last dictated text, shown briefly on-screen.
     std::string transcript;
     uint32_t    transcript_at_ms = 0;  // when received, for auto-hide

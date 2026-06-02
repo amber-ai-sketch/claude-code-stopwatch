@@ -34,17 +34,30 @@ public:
 
     // Called by the lv_anim exec callback. `t` in [0,1] is the eased phase.
     void apply_phase(float t);
+    void apply_zzz_phase(float t);
+    void set_leg_phase(float t);   // leg stepping callback (1.2s cycle)
 
 private:
     void _stop_anims();
+    void _apply_legs_phase(float t);  // alternating leg step positions
 
-    lv_obj_t* _root   = nullptr;  // transparent container holding all parts
+    lv_obj_t* _root   = nullptr;  // transparent container (no transform → no clipping)
+    lv_obj_t* _char   = nullptr;  // character sub-container (body/claws/legs/eyes)
     lv_obj_t* _body   = nullptr;
     lv_obj_t* _clawL  = nullptr;
     lv_obj_t* _clawR  = nullptr;
     lv_obj_t* _legs[4] = {};
     lv_obj_t* _eyeL   = nullptr;
     lv_obj_t* _eyeR   = nullptr;
+
+    // zzz floating labels (idle state only) — on parent, not _root, to avoid clipping
+    lv_obj_t* _zzz[3] = {};
+    lv_anim_t _zzzAnim{};
+    int _zzz_base_y[3] = {};     // starting y for each z (pre-animation, parent coords)
+    int _root_px = 0, _root_py = 0;  // root position on parent (for zzz positioning)
+
+    float _leg_phase = 0;        // separate leg cycle (1.2s vs body 1.8s)
+    lv_anim_t _legAnim{};
 
     ClawdState _state = ClawdState::Idle;
 };

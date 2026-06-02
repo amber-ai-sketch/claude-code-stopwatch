@@ -29,7 +29,8 @@ public:
 
     void update(int sessions_total, int sessions_running, int sessions_waiting,
                 std::optional<ClawdState> override_state = std::nullopt,
-                bool ble_connected = true);
+                bool ble_connected = true,
+                uint8_t battery_pct = 0, bool battery_charging = false);
 
     lv_obj_t* lvobj() const { return _root; }
 
@@ -42,7 +43,13 @@ private:
     lv_obj_t* _count_sub  = nullptr;  // "running" / "idle" / ...
     std::unique_ptr<ClawdPet> _pet;
 
+    // Battery gauge — thin bar near the top.
+    lv_obj_t* _bat_track = nullptr;  // dark background
+    lv_obj_t* _bat_fill  = nullptr;  // colored fill (width = pct%)
+    lv_obj_t* _bat_pct   = nullptr;  // "72" label
+
     ClawdState _shown = ClawdState::Idle;
+    int _waiting_ticks = 0;  // debounce: only show Waiting after 2 consecutive updates
 };
 
 }  // namespace clawd_watch
